@@ -34,11 +34,23 @@ jobs:
             type=semver,pattern={{version}}
             type=raw,value=latest,enable={{is_default_branch}}
 
+      # NEXT_PUBLIC_* é gravado no bundle em build time (ver frontend/Dockerfile) —
+      # só o frontend precisa; nos outros services o build-arg fica vazio/ignorado.
+      - id: buildargs
+        run: |
+          if [ "${{ matrix.service }}" = "frontend" ]; then
+            echo "next_public_api_url=https://hooks.arkitekt.space" >> "$GITHUB_OUTPUT"
+          else
+            echo "next_public_api_url=" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: docker/build-push-action@v6
         with:
           context: .
           file: ${{ matrix.service }}/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ steps.buildargs.outputs.next_public_api_url }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

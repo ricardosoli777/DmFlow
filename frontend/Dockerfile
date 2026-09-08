@@ -10,6 +10,11 @@ RUN npm install
 COPY packages/db packages/db
 COPY frontend frontend
 RUN npm run generate --workspace=@dmflow/db
+# NEXT_PUBLIC_* é gravado no bundle JS em build time, não lido em runtime do
+# container — precisa ser passado como build-arg (ver docker-compose.yml e
+# .github/workflows/release.yml), não só como env do container final.
+ARG NEXT_PUBLIC_API_URL=http://localhost:4000
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN npm run build --workspace=@dmflow/frontend
 
 FROM node:20-alpine AS runtime
