@@ -122,7 +122,12 @@ DMFlow/
 
 ## Status atual
 
-Fundação do monorepo criada (Wave 0) + esqueleto funcional de backend,
-worker e frontend (Waves 1-4 em andamento). Ver
-[`docs/07-plano-waves-spec-driven.md`](docs/07-plano-waves-spec-driven.md)
+- ✅ Wave 0 — fundação do monorepo
+- ✅ Wave 1 — backend/worker/frontend base (webhook, banco, fila, dashboard)
+- 🟡 Wave 2 — integração real com a Meta: código implementado (envio de DM,
+  private reply, parsing do webhook oficial, janela de 24h), falta só
+  preencher credenciais reais e validar ponta a ponta
+- ⏳ Wave 3 (refinar flow engine) / Wave 4 (completar dashboard) em aberto
+
+Ver [`docs/07-plano-waves-spec-driven.md`](docs/07-plano-waves-spec-driven.md)
 pro estado detalhado de cada etapa.

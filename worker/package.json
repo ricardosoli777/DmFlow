@@ -8,13 +8,14 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
-    "lint": "eslint src --ext .ts",
+    "lint": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
     "@dmflow/db": "*",
     "bullmq": "^5.12.0",
-    "ioredis": "^5.4.1"
+    "ioredis": "^5.4.1",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^20.14.10",

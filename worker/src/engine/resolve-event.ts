@@ -20,12 +20,17 @@ type MessageEvent = {
 
 export type InstagramEvent = CommentEvent | MessageEvent;
 
-// RF01, RF02 — decide qual trigger/flow_run corresponde a um evento cru.
+// RF01, RF02, RNF01 — decide qual trigger/flow_run corresponde a um evento
+// cru, e marca a abertura da janela de 24h de mensagens.
 export async function resolveEvent(event: InstagramEvent): Promise<void> {
   const contact = await prisma.contact.upsert({
     where: { igsid: event.fromIgsid },
-    update: {},
-    create: { igsid: event.fromIgsid, name: "fromName" in event ? event.fromName : undefined },
+    update: { lastInboundAt: new Date() },
+    create: {
+      igsid: event.fromIgsid,
+      name: "fromName" in event ? event.fromName : undefined,
+      lastInboundAt: new Date(),
+    },
   });
 
   if (event.kind === "comment") {
@@ -44,7 +49,13 @@ export async function resolveEvent(event: InstagramEvent): Promise<void> {
     const definition = flow.definition as unknown as { start: string };
 
     const run = await prisma.flowRun.create({
-      data: { contactId: contact.id, flowId: flow.id, currentNode: definition.start, status: "running" },
+      data: {
+        contactId: contact.id,
+        flowId: flow.id,
+        currentNode: definition.start,
+        status: "running",
+        context: { originCommentId: event.commentId },
+      },
     });
 
     await advanceFlowRun(run.id);
@@ -56,8 +67,22 @@ export async function resolveEvent(event: InstagramEvent): Promise<void> {
     where: { contactId: contact.id, status: "waiting" },
     orderBy: { updatedAt: "desc" },
   });
-  if (!run) return;
 
   await prisma.message.create({ data: { contactId: contact.id, direction: "inbound", content: event.text } });
-  await advanceFlowRun(run.id);
+
+  if (!run) return;
+
+  if (event.kind === "postback") {
+    await advanceToButtonTarget(run.id, event.text);
+    return;
+  }
+
+  await advanceFlowRun(run.id, { capturedText: event.text });
+}
+
+async function advanceToButtonTarget(flowRunId: string, payload: string): Promise<void> {
+  // payload do postback é o id do node de destino, definido no node "buttons"
+  // (ver frontend/components/flow-editor — cada botão carrega seu next node).
+  await prisma.flowRun.update({ where: { id: flowRunId }, data: { currentNode: payload, status: "running" } });
+  await advanceFlowRun(flowRunId);
 }

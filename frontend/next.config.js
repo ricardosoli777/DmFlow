@@ -4,9 +4,12 @@ const path = require("node:path");
 const nextConfig = {
   output: "standalone",
   reactStrictMode: true,
-  // Monorepo: garante que o tracing do build standalone inclua os
-  // node_modules hoisted na raiz do workspace (ver Dockerfile).
-  outputFileTracingRoot: path.join(__dirname, ".."),
+  experimental: {
+    // Monorepo: garante que o tracing do build standalone inclua os
+    // node_modules hoisted na raiz do workspace (ver Dockerfile). Em
+    // Next 15+ isso vira top-level estável — mover na hora do upgrade.
+    outputFileTracingRoot: path.join(__dirname, ".."),
+  },
 };
 
 module.exports = nextConfig;

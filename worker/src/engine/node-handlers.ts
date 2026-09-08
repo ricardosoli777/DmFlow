@@ -15,29 +15,34 @@ export type NodeResult = {
   waitingForInput: boolean;
 };
 
+type HandlerArgs = {
+  node: FlowNode;
+  run: FlowRun;
+  contact: Contact;
+  /** Presente quando o node está sendo retomado após esperar resposta do usuário (ex: capture). */
+  resumeInput?: string;
+};
+
 // RF05 — um handler por tipo de node, testável isoladamente.
-export const nodeHandlers: Record<
-  FlowNode["type"],
-  (node: FlowNode, run: FlowRun, contact: Contact) => Promise<NodeResult>
-> = {
-  message: async (node, run, contact) => {
+export const nodeHandlers: Record<FlowNode["type"], (args: HandlerArgs) => Promise<NodeResult>> = {
+  message: async ({ node, contact }) => {
     await sendDirectMessage(contact.igsid, String(node.text ?? ""));
     return { nextNodeId: (node.next as string) ?? null, waitingForInput: false };
   },
 
-  buttons: async (node, run, contact) => {
+  buttons: async ({ node, contact }) => {
     await sendDirectMessage(contact.igsid, String(node.text ?? ""));
-    // Próximo node é resolvido quando o usuário responder (ver resolveTrigger)
+    // Próximo node é resolvido via postback quando o usuário clica (ver resolve-event.ts)
     return { nextNodeId: null, waitingForInput: true };
   },
 
-  delay: async (node) => {
+  delay: async ({ node }) => {
     // RNF01: delays longos precisam checar a janela de 24h antes de reenviar —
-    // agendamento real (BullMQ delayed job) entra na Wave 3.
+    // agendamento real (BullMQ delayed job) entra no refinamento da Wave 3.
     return { nextNodeId: (node.next as string) ?? null, waitingForInput: false };
   },
 
-  condition: async (node, run, contact) => {
+  condition: async ({ node, contact }) => {
     const field = String(node.field ?? "");
     const value = (contact.attributes as Record<string, unknown>)[field];
     const matches = value === node.equals;
@@ -45,12 +50,21 @@ export const nodeHandlers: Record<
     return { nextNodeId: next ?? null, waitingForInput: false };
   },
 
-  capture: async (node, run, contact) => {
-    await sendDirectMessage(contact.igsid, String(node.prompt ?? ""));
-    return { nextNodeId: null, waitingForInput: true };
+  capture: async ({ node, contact, resumeInput }) => {
+    if (resumeInput === undefined) {
+      await sendDirectMessage(contact.igsid, String(node.prompt ?? ""));
+      return { nextNodeId: null, waitingForInput: true };
+    }
+
+    const field = String(node.field ?? "value");
+    await prisma.contact.update({
+      where: { id: contact.id },
+      data: { attributes: { ...(contact.attributes as object), [field]: resumeInput } },
+    });
+    return { nextNodeId: (node.next as string) ?? null, waitingForInput: false };
   },
 
-  tag: async (node, run, contact) => {
+  tag: async ({ node, contact }) => {
     const tag = String(node.tag ?? "");
     await prisma.contact.update({
       where: { id: contact.id },
@@ -59,7 +73,7 @@ export const nodeHandlers: Record<
     return { nextNodeId: (node.next as string) ?? null, waitingForInput: false };
   },
 
-  webhook: async (node) => {
+  webhook: async ({ node }) => {
     const url = String(node.url ?? "");
     if (url) {
       await fetch(url, { method: "POST", body: JSON.stringify({ nodeId: node.id }) }).catch(() => null);

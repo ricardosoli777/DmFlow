@@ -1,3 +1,4 @@
+import type { Prisma } from "@dmflow/db";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
@@ -32,7 +33,9 @@ export async function flowRoutes(app: FastifyInstance) {
 
   app.post("/flows", async (req, reply) => {
     const body = saveSchema.parse(req.body);
-    const flow = await prisma.flow.create({ data: body });
+    const flow = await prisma.flow.create({
+      data: { name: body.name, definition: body.definition as Prisma.InputJsonValue },
+    });
     return reply.status(201).send(flow);
   });
 
@@ -41,7 +44,11 @@ export async function flowRoutes(app: FastifyInstance) {
     const body = saveSchema.parse(req.body);
     return prisma.flow.update({
       where: { id },
-      data: { ...body, version: { increment: 1 } },
+      data: {
+        name: body.name,
+        definition: body.definition as Prisma.InputJsonValue,
+        version: { increment: 1 },
+      },
     });
   });
 }

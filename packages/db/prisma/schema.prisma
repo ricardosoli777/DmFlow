@@ -18,15 +18,18 @@ model User {
 }
 
 model Contact {
-  id         String     @id @default(uuid())
-  igsid      String     @unique
-  name       String?
-  avatarUrl  String?
-  tags       String[]   @default([])
-  attributes Json       @default("{}")
-  createdAt  DateTime   @default(now())
-  flowRuns   FlowRun[]
-  messages   Message[]
+  id            String     @id @default(uuid())
+  igsid         String     @unique
+  name          String?
+  avatarUrl     String?
+  tags          String[]   @default([])
+  attributes    Json       @default("{}")
+  // RNF01: última interação iniciada pelo usuário (comentário ou DM) —
+  // usada pra checar a janela de 24h da Instagram Messaging API.
+  lastInboundAt DateTime?
+  createdAt     DateTime   @default(now())
+  flowRuns      FlowRun[]
+  messages      Message[]
 
   @@map("contacts")
 }
@@ -76,7 +79,7 @@ model Message {
   id        String   @id @default(uuid())
   contactId String
   contact   Contact  @relation(fields: [contactId], references: [id])
-  direction String   // inbound | outbound
+  direction String   // inbound | outbound | blocked (RNF01: fora da janela de 24h)
   content   String
   createdAt DateTime @default(now())
 
