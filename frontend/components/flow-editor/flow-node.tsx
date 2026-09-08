@@ -8,11 +8,12 @@ import {
   Send,
   StopCircle,
   Tag,
+  Trash2,
   Video,
   Webhook,
 } from "lucide-react";
 import { Handle, Position, type NodeProps } from "reactflow";
-import type { FlowNodeType } from "@/stores/flow-editor.store";
+import { useFlowEditorStore, type FlowNodeType } from "@/stores/flow-editor.store";
 
 const icons: Record<FlowNodeType, typeof MessageSquare> = {
   message: MessageSquare,
@@ -47,16 +48,29 @@ type NodeData = {
 // Node visual do canvas — RF10. Mostra o conteúdo real configurado (texto,
 // CTA dos botões) direto no card, não só o label genérico do tipo — edição
 // completa fica no painel de propriedades (node-inspector.tsx).
-export function FlowNode({ data, selected }: NodeProps<NodeData>) {
+export function FlowNode({ id, data, selected }: NodeProps<NodeData>) {
   const Icon = icons[data.type];
   const preview = getPreview(data);
+  const deleteNode = useFlowEditorStore((s) => s.deleteNode);
 
   return (
     <div
-      className={`min-w-[200px] max-w-[260px] rounded-[var(--radius)] border bg-card px-4 py-3 shadow-sm ${
+      className={`group relative min-w-[200px] max-w-[260px] rounded-[var(--radius)] border bg-card px-4 py-3 shadow-sm ${
         selected ? "border-primary ring-2 ring-primary/30" : "border-border"
       }`}
     >
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          deleteNode(id);
+        }}
+        className="absolute -right-2 -top-2 hidden h-6 w-6 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm hover:border-danger hover:text-danger group-hover:flex"
+        aria-label="Excluir node"
+      >
+        <Trash2 size={12} />
+      </button>
+
       <Handle type="target" position={Position.Top} className="!bg-primary" />
       <div className="flex items-center gap-2">
         <Icon size={16} className="shrink-0 text-primary" />
