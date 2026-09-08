@@ -130,9 +130,18 @@ pra produção).
 
 | Etapa | Entrega | Critério de aceite | Status |
 |---|---|---|---|
-| 6A — Stack Swarm | `docker stack deploy -c infra/docker-stack.yml dmflow` usando as imagens do GHCR | Serviço `dmflow_*` aparece `Running` no `docker service ls` | Arquivo pronto (`infra/docker-stack.yml`) — deploy real ainda não executado |
-| 6B — Traefik + domínio | `dmflow.arkitekt.space` (dashboard) + `hooks.arkitekt.space` (API/webhook) com HTTPS | Sites acessíveis via HTTPS, certificado válido | DNS já resolvendo (wildcard `*.arkitekt.space` existente); labels do Traefik já no stack, replicando o padrão de `letsencryptresolver` + rede `Arkitekt` usado pelos outros serviços da VPS |
-| 6C — Webhook produção | Webhook da Meta reapontado pra URL de produção | Evento real de comentário processado em produção, ponta a ponta | Pendente do deploy (6A) |
+| 6A — Stack Swarm | `docker stack deploy -c infra/docker-stack.yml dmflow` usando as imagens do GHCR | Serviço `dmflow_*` aparece `Running` no `docker service ls` | ✅ Feito — todos os 7 serviços `1/1` (migrate `0/1` é esperado, roda uma vez e conclui) |
+| 6B — Traefik + domínio | `dmflow.arkitekt.space` (dashboard) + `hooks.arkitekt.space` (API/webhook) com HTTPS | Sites acessíveis via HTTPS, certificado válido | ✅ Confirmado: `dmflow.arkitekt.space` → HTTP 200, `hooks.arkitekt.space/health` → HTTP 200 |
+| 6C — Webhook produção | Webhook da Meta reapontado pra URL de produção | Evento real de comentário processado em produção, ponta a ponta | Pendente — falta configurar o webhook no painel da Meta apontando pra `https://hooks.arkitekt.space/webhooks/instagram` (passo 3 do "klead - IG") |
+
+### Bugs corrigidos no deploy real (não apareciam em build local)
+
+1. **`@dmflow/db` sem build** — `package.json` apontava `main` direto pro `.ts`, funcionava em dev (`tsx`) mas quebrava em runtime com `node` puro. Corrigido: `tsconfig.json` + script `build` compilando pra `dist/`.
+2. **Prisma sem OpenSSL no Alpine** — `node:20-alpine` não traz `openssl`; Prisma detectava errado e tentava rebaixar engine em runtime, esbarrando em permissão (container roda non-root). Corrigido: `apk add --no-cache openssl` nos Dockerfiles.
+3. **Migration inicial nunca gerada** — só existia `schema.prisma`, sem `prisma/migrations/`. `migrate deploy` rodava sem erro mas não criava nenhuma tabela. Corrigido: migration gerada via `prisma migrate diff --from-empty` e commitada.
+4. **Next.js `standalone` não escutava em `0.0.0.0`** — o mais sutil: o server só respondia em `localhost`/IPv6 dentro do container, então nem o próprio healthcheck conseguia conectar (`Connection refused`), e o Swarm matava a task silenciosamente (exit limpo). Corrigido: `ENV HOSTNAME=0.0.0.0` no Dockerfile (fix oficial do Next.js pra Docker).
+
+**Lição pro processo:** todos os 4 só apareceram rodando o deploy de verdade — reforça por que o "Verify" de cada wave não pode ser só "buildou sem erro".
 
 ---
 

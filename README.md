@@ -160,10 +160,13 @@ DMFlow/
 
 - ✅ Wave 0 — fundação do monorepo
 - ✅ Wave 1 — backend/worker/frontend base (webhook, banco, fila, dashboard)
-- 🟡 Wave 2 — integração real com a Meta: código implementado (envio de DM,
-  private reply, parsing do webhook oficial, janela de 24h), falta só
-  preencher credenciais reais e validar ponta a ponta
+- 🟡 Wave 2 — integração real com a Meta: código pronto, credenciais
+  configuradas (app "klead - IG"); falta só apontar o webhook pra URL de
+  produção e testar ponta a ponta
 - ⏳ Wave 3 (refinar flow engine) / Wave 4 (completar dashboard) em aberto
+- ✅ **Wave 6 — no ar em produção:** https://dmflow.arkitekt.space
+  (dashboard) e https://hooks.arkitekt.space (API/webhook), rodando via
+  Docker Swarm na VPS arkitekt.space
 
 Ver [`docs/07-plano-waves-spec-driven.md`](docs/07-plano-waves-spec-driven.md)
 pro estado detalhado de cada etapa.
