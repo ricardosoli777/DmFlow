@@ -26,8 +26,8 @@ visualmente no dashboard, sem escrever código.
    - **Mac/Linux:** abra o terminal na pasta e rode `./setup.sh`
 4. Na primeira vez, ele vai criar um arquivo `.env` e pedir pra você
    preenchê-lo. Abra o `.env` num editor de texto e preencha:
-   - As credenciais do Meta (veja o passo a passo em
-     [`docs/04-integracao-meta.md`](docs/04-integracao-meta.md))
+   - As credenciais do Meta (veja onde pegar cada uma logo abaixo, ou o
+     detalhe completo em [`docs/04-integracao-meta.md`](docs/04-integracao-meta.md))
    - Um e-mail/senha de sua escolha pra ser o login do dashboard
 5. Rode o script de novo. Ele vai baixar as imagens prontas e subir tudo.
 6. Acesse **http://localhost:3000** e faça login com o e-mail/senha que você
@@ -36,6 +36,26 @@ visualmente no dashboard, sem escrever código.
 Isso sobe: banco de dados, fila, armazenamento de arquivos, API, worker
 (motor de automação) e o dashboard — tudo junto, isolado, sem precisar
 instalar Node, Postgres ou qualquer outra coisa manualmente.
+
+### 🔑 Onde pegar cada credencial da Meta
+
+Use o [`credenciais.txt`](credenciais.txt) como rascunho (não vai pro
+GitHub) e depois copie pro `.env`. Passo a passo completo, com telas e
+nomes de menu, em [`docs/04-integracao-meta.md`](docs/04-integracao-meta.md#-passo-a-passo-onde-pegar-cada-credencial).
+Resumo:
+
+| Variável | Onde pegar |
+|---|---|
+| `META_APP_ID` / `META_APP_SECRET` | developers.facebook.com/apps → seu app → **Configurações do app → Básico** |
+| `META_PAGE_ACCESS_TOKEN` | Dentro do app → **Adicionar produto → Instagram → Instagram API setup** → etapa "Generate access tokens" |
+| `META_IG_USER_ID` | **Ferramentas → Graph API Explorer** → `GET /me/accounts?fields=instagram_business_account` |
+| `META_VERIFY_TOKEN` | Você mesmo inventa (senha aleatória) — usa o mesmo valor ao configurar o Webhook no app |
+
+Antes de tudo isso: a conta Instagram precisa ser **Business** e estar
+vinculada a uma **Página do Facebook** (Instagram → Configurações → Contas
+conectadas), e sua própria conta precisa estar como **testador** do app
+(**Papéis do app → Papéis → Adicionar pessoas**) — assim você usa tudo sem
+precisar passar pelo App Review da Meta.
 
 ## 🛠 Como rodar (desenvolvedor, ambiente de desenvolvimento local)
 
