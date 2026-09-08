@@ -65,15 +65,24 @@ Pré-requisito: Wave 1 completa + Wave 0.3 (app Meta configurado).
 
 | Etapa | Entrega | Critério de aceite | Status |
 |---|---|---|---|
-| 2A — Envio de DM | Serviço que chama Private Reply + Instagram Messaging API | Comentário real de teste dispara DM real na sua conta | Código pronto (`worker/src/services/instagram.ts`) — falta credencial real pra testar ponta a ponta |
-| 2B — Recebimento de resposta | Handler de `messages`/`messaging_postbacks` gravando resposta do usuário | Responder a DM de teste gera registro em `messages_log` em até 1 wave de webhook | Código pronto (`worker/src/engine/parse-meta-payload.ts` + `resolve-event.ts`) |
-| 2C — Janela de 24h | Checagem de timestamp antes de enviar mensagem fora do gatilho imediato | Tentativa de envio fora da janela é bloqueada e logada, não falha silenciosamente | Pronto — `Contact.lastInboundAt` + bloqueio logado como `Message.direction = "blocked"` |
+| 2A — Envio de DM | Serviço que chama Private Reply + Instagram Messaging API | Comentário real de teste dispara DM real na sua conta | Código pronto e credenciais reais configuradas (app "klead - IG") — falta só apontar o webhook na Meta pra validar com comentário real |
+| 2B — Recebimento de resposta | Handler de `messages`/`messaging_postbacks` gravando resposta do usuário | Responder a DM de teste gera registro em `messages_log` em até 1 wave de webhook | Código pronto, pipeline completo verificado (ver abaixo) |
+| 2C — Janela de 24h | Checagem de timestamp antes de enviar mensagem fora do gatilho imediato | Tentativa de envio fora da janela é bloqueada e logada, não falha silenciosamente | ✅ Pronto — `Contact.lastInboundAt` + bloqueio logado como `Message.direction = "blocked"` |
 
-**Verify da wave (pendente — depende de credenciais reais):** preencher
-`META_APP_ID/SECRET`, `META_PAGE_ACCESS_TOKEN` e `META_IG_USER_ID` no `.env`
-(ver `docs/04-integracao-meta.md`), configurar o webhook apontando pro
-backend rodando publicamente, e testar ponta a ponta num post real de teste
-— comenta, recebe DM, responde, sistema registra em `messages_log`.
+**Verify da wave — feito em produção (2026-09-08):**
+- ✅ `GET /webhooks/instagram` com o verify token certo → responde o
+  `hub.challenge` (HTTP 200); com token errado → 403. Handshake da Meta vai
+  funcionar quando configurado.
+- ✅ Simulei um evento de comentário real (payload assinado com HMAC do App
+  Secret de verdade) via `POST /webhooks/instagram` → pipeline completo
+  rodou: webhook validou a assinatura → publicou na fila → o worker
+  consumiu → criou o contato no banco → marcou o evento como processado.
+  Nenhum DM foi enviado porque não havia trigger cadastrado pro post de
+  teste (comportamento correto, RF02).
+- ⏳ **Falta só:** configurar a URL do webhook no painel da Meta
+  (`https://hooks.arkitekt.space/webhooks/instagram` + o verify token) e
+  testar com um comentário real, numa conta/post de verdade — só isso
+  depende de uma ação manual sua no painel da Meta, não de código.
 
 ---
 
