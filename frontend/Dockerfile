@@ -15,6 +15,10 @@ RUN npm run build --workspace=@dmflow/frontend
 FROM node:20-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
+# O server.js do modo "standalone" do Next.js só escuta em localhost/IPv6 por
+# padrão dentro do container — sem isso, nem o healthcheck interno consegue
+# conectar. Fix documentado oficialmente pelo Next.js pra Docker.
+ENV HOSTNAME=0.0.0.0
 COPY --from=build /repo/frontend/.next/standalone ./
 COPY --from=build /repo/frontend/.next/static ./frontend/.next/static
 COPY --from=build /repo/frontend/public ./frontend/public
