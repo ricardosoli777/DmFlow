@@ -98,15 +98,32 @@ passar pelo processo de App Review — ver seção abaixo.
 
 ## Permissões (scopes) necessárias
 
-- `instagram_basic`
-- `instagram_manage_comments`
-- `instagram_manage_messages`
-- `pages_show_list`
-- `pages_manage_metadata`
-- `pages_read_engagement`
-- Dependendo da versão da API: `instagram_business_manage_messages` etc —
-  a nomenclatura muda com frequência, checar changelog da Graph API na hora
-  de implementar.
+A Meta mantém duas nomenclaturas em paralelo — depende de qual fluxo
+aparece pra você no **Instagram API setup** dentro do app (normalmente ela
+já pré-seleciona certo, isso aqui é só referência).
+
+**Fluxo novo — "Instagram Business Login":**
+
+| Permissão | Pra que serve |
+|---|---|
+| `instagram_business_basic` | Ler dados básicos da conta/mídia — base pra tudo |
+| `instagram_business_manage_messages` | Obrigatória — enviar/receber DM, private reply (RF03) |
+| `instagram_business_manage_comments` | Obrigatória — ler/responder comentários, o gatilho do fluxo (RF01) |
+
+**Fluxo antigo — vinculado à Página do Facebook:**
+
+| Permissão | Pra que serve |
+|---|---|
+| `instagram_basic` | Ler dados básicos da conta Instagram |
+| `instagram_manage_comments` | Obrigatória — webhook de comentários + resposta (RF01) |
+| `instagram_manage_messages` | Obrigatória — envio/recebimento de DM (RF03) |
+| `pages_show_list` | Listar as Páginas da sua conta, pra achar a que tem o Instagram vinculado |
+| `pages_read_engagement` | Ler engajamento da Página (comentários passam por aqui nesse fluxo) |
+| `pages_manage_metadata` | Assinar webhooks via API — a Meta às vezes exige mesmo configurando pela UI |
+
+**Não precisa (pode desmarcar se a Meta oferecer):** `instagram_content_publish`
+/ `instagram_business_content_publish` (publicação de posts), e qualquer
+permissão de anúncios (`pages_manage_ads` etc) — fora do escopo do DMFlow.
 
 ## Como o fluxo técnico funciona no lado Meta
 
