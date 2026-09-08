@@ -34,6 +34,13 @@ export function parseMetaPayload(payload: unknown): InstagramEvent[] {
         continue;
       }
 
+      // Clique em botão (quick reply) chega como "message" com quick_reply.payload —
+      // tratamos igual a um postback (payload = id do node de destino).
+      if (messaging.message?.quick_reply?.payload) {
+        events.push({ kind: "postback", fromIgsid, text: messaging.message.quick_reply.payload });
+        continue;
+      }
+
       if (messaging.message?.text) {
         events.push({ kind: "message", fromIgsid, text: messaging.message.text });
       }

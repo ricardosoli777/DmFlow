@@ -8,3 +8,5 @@ export function getPrisma(): PrismaClient {
   if (!prisma) prisma = new PrismaClient();
   return prisma;
 }
+
+export * from "./settings";

@@ -1,11 +1,26 @@
 "use client";
 
-import { Clock, GitBranch, MessageSquare, MousePointerClick, Send, StopCircle, Tag, Webhook } from "lucide-react";
+import {
+  Clock,
+  GitBranch,
+  Image as ImageIcon,
+  MessageSquare,
+  MousePointerClick,
+  Music,
+  Send,
+  StopCircle,
+  Tag,
+  Video,
+  Webhook,
+} from "lucide-react";
 import type { FlowNodeType } from "@/stores/flow-editor.store";
 
 const paletteItems: { type: FlowNodeType; label: string; icon: typeof MessageSquare }[] = [
   { type: "message", label: "Mensagem", icon: MessageSquare },
   { type: "buttons", label: "Botões", icon: MousePointerClick },
+  { type: "image", label: "Imagem", icon: ImageIcon },
+  { type: "audio", label: "Áudio", icon: Music },
+  { type: "video", label: "Vídeo", icon: Video },
   { type: "delay", label: "Aguardar", icon: Clock },
   { type: "condition", label: "Condição", icon: GitBranch },
   { type: "capture", label: "Capturar", icon: Send },

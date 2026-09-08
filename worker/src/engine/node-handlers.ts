@@ -1,12 +1,14 @@
 import type { Contact, FlowRun } from "@dmflow/db";
 import { getPrisma } from "@dmflow/db";
-import { sendDirectMessage } from "../services/instagram";
+import { sendButtonsMessage, sendDirectMessage, sendMediaMessage } from "../services/instagram";
 
 const prisma = getPrisma();
 
+export type ButtonOption = { label: string; next: string };
+
 export type FlowNode = {
   id: string;
-  type: "message" | "buttons" | "delay" | "condition" | "capture" | "tag" | "webhook" | "end";
+  type: "message" | "buttons" | "image" | "audio" | "video" | "delay" | "condition" | "capture" | "tag" | "webhook" | "end";
   [key: string]: unknown;
 };
 
@@ -31,9 +33,29 @@ export const nodeHandlers: Record<FlowNode["type"], (args: HandlerArgs) => Promi
   },
 
   buttons: async ({ node, contact }) => {
-    await sendDirectMessage(contact.igsid, String(node.text ?? ""));
+    const options = (node.options as ButtonOption[] | undefined) ?? [];
+    await sendButtonsMessage(
+      contact.igsid,
+      String(node.text ?? ""),
+      options.map((o) => ({ title: o.label, payload: o.next })),
+    );
     // Próximo node é resolvido via postback quando o usuário clica (ver resolve-event.ts)
     return { nextNodeId: null, waitingForInput: true };
+  },
+
+  image: async ({ node, contact }) => {
+    await sendMediaMessage(contact.igsid, "image", String(node.url ?? ""));
+    return { nextNodeId: (node.next as string) ?? null, waitingForInput: false };
+  },
+
+  audio: async ({ node, contact }) => {
+    await sendMediaMessage(contact.igsid, "audio", String(node.url ?? ""));
+    return { nextNodeId: (node.next as string) ?? null, waitingForInput: false };
+  },
+
+  video: async ({ node, contact }) => {
+    await sendMediaMessage(contact.igsid, "video", String(node.url ?? ""));
+    return { nextNodeId: (node.next as string) ?? null, waitingForInput: false };
   },
 
   delay: async ({ node }) => {

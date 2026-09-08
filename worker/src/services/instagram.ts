@@ -1,10 +1,8 @@
 // Envio real via Instagram Messaging API — RF03, RNF01.
 // Docs: docs/04-integracao-meta.md
-import { getPrisma } from "@dmflow/db";
-import { env } from "../env";
+import { getMetaSettings, getPrisma } from "@dmflow/db";
 
 const prisma = getPrisma();
-const GRAPH_BASE = `https://graph.facebook.com/${env.META_GRAPH_API_VERSION}`;
 const WINDOW_24H_MS = 24 * 60 * 60 * 1000;
 
 class MessagingWindowClosedError extends Error {
@@ -13,29 +11,66 @@ class MessagingWindowClosedError extends Error {
   }
 }
 
-/**
- * Envia uma DM livre pro usuário. Bloqueia (e loga, nunca falha silenciosamente)
- * se a última interação dele foi há mais de 24h — regra da Meta (RNF01).
- */
-export async function sendDirectMessage(igsid: string, text: string): Promise<void> {
+type QuickReply = { title: string; payload: string };
+
+async function ensureWithinWindow(igsid: string, logContent: string): Promise<boolean> {
   const contact = await prisma.contact.findUniqueOrThrow({ where: { igsid } });
 
   if (!isWithinMessagingWindow(contact.lastInboundAt)) {
     await prisma.message.create({
-      data: { contactId: contact.id, direction: "blocked", content: text },
+      data: { contactId: contact.id, direction: "blocked", content: logContent },
     });
     console.warn(new MessagingWindowClosedError(igsid).message);
-    return;
+    return false;
   }
+  return true;
+}
 
-  await callGraphApi(`/${env.META_IG_USER_ID}/messages`, {
-    recipient: { id: igsid },
-    message: { text },
-  });
+/**
+ * Envia uma DM de texto livre. Bloqueia (e loga, nunca falha silenciosamente)
+ * se a última interação foi há mais de 24h — regra da Meta (RNF01).
+ */
+export async function sendDirectMessage(igsid: string, text: string): Promise<void> {
+  if (!(await ensureWithinWindow(igsid, text))) return;
 
-  await prisma.message.create({
-    data: { contactId: contact.id, direction: "outbound", content: text },
+  await callSend(igsid, { text });
+  await logOutbound(igsid, text);
+}
+
+/**
+ * Envia mensagem com botões (quick replies) — até 13 opções, cada uma com
+ * um payload que o worker usa pra saber qual node seguir (ver
+ * resolve-event.ts / node-handlers.ts).
+ */
+export async function sendButtonsMessage(igsid: string, text: string, options: QuickReply[]): Promise<void> {
+  if (!(await ensureWithinWindow(igsid, text))) return;
+
+  await callSend(igsid, {
+    text,
+    quick_replies: options.slice(0, 13).map((o) => ({
+      content_type: "text",
+      title: o.title.slice(0, 20),
+      payload: o.payload,
+    })),
   });
+  await logOutbound(igsid, `${text} [botões: ${options.map((o) => o.title).join(", ")}]`);
+}
+
+/**
+ * Envia mídia (imagem/áudio/vídeo) por URL pública.
+ */
+export async function sendMediaMessage(
+  igsid: string,
+  mediaType: "image" | "audio" | "video",
+  url: string,
+): Promise<void> {
+  if (!url) return;
+  if (!(await ensureWithinWindow(igsid, `[${mediaType}] ${url}`))) return;
+
+  await callSend(igsid, {
+    attachment: { type: mediaType, payload: { url, is_reusable: true } },
+  });
+  await logOutbound(igsid, `[${mediaType}] ${url}`);
 }
 
 /**
@@ -43,7 +78,8 @@ export async function sendDirectMessage(igsid: string, text: string): Promise<vo
  * permitido pela Meta logo após o comentário — não passa pela checagem de janela.
  */
 export async function sendPrivateReply(commentId: string, text: string): Promise<void> {
-  await callGraphApi(`/${commentId}/private_replies`, { message: text });
+  const settings = await getMetaSettings();
+  await callGraphApi(settings, `/${commentId}/private_replies`, { message: text });
 }
 
 function isWithinMessagingWindow(lastInboundAt: Date | null): boolean {
@@ -51,17 +87,37 @@ function isWithinMessagingWindow(lastInboundAt: Date | null): boolean {
   return Date.now() - lastInboundAt.getTime() <= WINDOW_24H_MS;
 }
 
-async function callGraphApi(path: string, body: Record<string, unknown>): Promise<void> {
-  if (!env.META_PAGE_ACCESS_TOKEN) {
-    console.log(`[dev sem token] POST ${GRAPH_BASE}${path}`, body);
+async function logOutbound(igsid: string, content: string): Promise<void> {
+  const contact = await prisma.contact.findUniqueOrThrow({ where: { igsid } });
+  await prisma.message.create({ data: { contactId: contact.id, direction: "outbound", content } });
+}
+
+async function callSend(igsid: string, message: Record<string, unknown>): Promise<void> {
+  const settings = await getMetaSettings();
+  await callGraphApi(settings, `/${settings.igUserId}/messages`, {
+    recipient: { id: igsid },
+    message,
+  });
+}
+
+async function callGraphApi(
+  settings: Awaited<ReturnType<typeof getMetaSettings>>,
+  path: string,
+  body: Record<string, unknown>,
+): Promise<void> {
+  if (!settings.pageAccessToken) {
+    console.log(`[dev sem token] POST graph.instagram.com/${settings.graphApiVersion}${path}`, body);
     return;
   }
 
-  const res = await fetch(`${GRAPH_BASE}${path}?access_token=${env.META_PAGE_ACCESS_TOKEN}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  const res = await fetch(
+    `https://graph.instagram.com/${settings.graphApiVersion}${path}?access_token=${settings.pageAccessToken}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
 
   if (!res.ok) {
     const errorBody = await res.text();

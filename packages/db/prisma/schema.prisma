@@ -94,3 +94,14 @@ model RawEvent {
 
   @@map("events_raw")
 }
+
+// Config editável pelo dashboard (ex: conexão com a conta Instagram) — dá
+// pra trocar de conta sem mexer no .env/redeploy. Backend/worker leem daqui
+// com fallback pras variáveis de ambiente (ver packages/db/src/settings.ts).
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}

@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { getMetaSettings } from "@dmflow/db";
 import type { FastifyInstance } from "fastify";
-import { env } from "../env";
 import { prisma } from "../lib/prisma";
 import { instagramEventsQueue } from "../lib/queue";
 
@@ -13,7 +13,9 @@ export async function webhookRoutes(app: FastifyInstance) {
     const token = query["hub.verify_token"];
     const challenge = query["hub.challenge"];
 
-    if (mode === "subscribe" && token === env.META_VERIFY_TOKEN) {
+    const settings = await getMetaSettings();
+
+    if (mode === "subscribe" && token === settings.verifyToken) {
       return reply.status(200).send(challenge);
     }
     return reply.status(403).send("Forbidden");
@@ -23,8 +25,9 @@ export async function webhookRoutes(app: FastifyInstance) {
   app.post("/webhooks/instagram", async (req, reply) => {
     const signature = req.headers["x-hub-signature-256"] as string | undefined;
     const rawBody = (req as any).rawBody as Buffer | undefined;
+    const settings = await getMetaSettings();
 
-    if (!signature || !rawBody || !isValidSignature(rawBody, signature)) {
+    if (!signature || !rawBody || !isValidSignature(rawBody, signature, settings.appSecret)) {
       return reply.status(401).send({ error: "invalid signature" });
     }
 
@@ -38,9 +41,8 @@ export async function webhookRoutes(app: FastifyInstance) {
   });
 }
 
-function isValidSignature(rawBody: Buffer, signatureHeader: string): boolean {
-  const expected =
-    "sha256=" + createHmac("sha256", env.META_APP_SECRET).update(rawBody).digest("hex");
+function isValidSignature(rawBody: Buffer, signatureHeader: string, appSecret: string): boolean {
+  const expected = "sha256=" + createHmac("sha256", appSecret).update(rawBody).digest("hex");
   const a = Buffer.from(expected);
   const b = Buffer.from(signatureHeader);
   return a.length === b.length && timingSafeEqual(a, b);

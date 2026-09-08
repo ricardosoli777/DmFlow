@@ -7,6 +7,7 @@ import { contactRoutes } from "./routes/contacts";
 import { flowRoutes } from "./routes/flows";
 import { messageRoutes } from "./routes/messages";
 import { metricsRoutes } from "./routes/metrics";
+import { settingsRoutes } from "./routes/settings";
 import { triggerRoutes } from "./routes/triggers";
 import { webhookRoutes } from "./routes/webhooks";
 
@@ -35,6 +36,7 @@ async function bootstrap() {
   await app.register(contactRoutes);
   await app.register(messageRoutes);
   await app.register(metricsRoutes);
+  await app.register(settingsRoutes);
 
   await app.listen({ port: env.PORT, host: "0.0.0.0" });
 }

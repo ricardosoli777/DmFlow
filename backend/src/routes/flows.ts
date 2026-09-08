@@ -5,7 +5,19 @@ import { prisma } from "../lib/prisma";
 
 const flowNodeSchema = z.object({
   id: z.string(),
-  type: z.enum(["message", "buttons", "delay", "condition", "capture", "tag", "webhook", "end"]),
+  type: z.enum([
+    "message",
+    "buttons",
+    "image",
+    "audio",
+    "video",
+    "delay",
+    "condition",
+    "capture",
+    "tag",
+    "webhook",
+    "end",
+  ]),
 });
 
 const flowDefinitionSchema = z.object({

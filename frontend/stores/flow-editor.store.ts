@@ -2,7 +2,18 @@ import type { Connection, Edge, EdgeChange, Node, NodeChange } from "reactflow";
 import { addEdge, applyEdgeChanges, applyNodeChanges } from "reactflow";
 import { create } from "zustand";
 
-export type FlowNodeType = "message" | "buttons" | "delay" | "condition" | "capture" | "tag" | "webhook" | "end";
+export type FlowNodeType =
+  | "message"
+  | "buttons"
+  | "image"
+  | "audio"
+  | "video"
+  | "delay"
+  | "condition"
+  | "capture"
+  | "tag"
+  | "webhook"
+  | "end";
 
 // Estado do canvas (client-only) — dados persistidos vêm/vão via TanStack Query,
 // nunca misturados aqui. Ver docs/03-motor-de-fluxos.md pro shape final salvo na API.
@@ -59,6 +70,9 @@ function defaultLabel(type: FlowNodeType): string {
   const labels: Record<FlowNodeType, string> = {
     message: "Nova mensagem",
     buttons: "Botões",
+    image: "Enviar imagem",
+    audio: "Enviar áudio",
+    video: "Enviar vídeo",
     delay: "Aguardar",
     condition: "Condição",
     capture: "Capturar resposta",
