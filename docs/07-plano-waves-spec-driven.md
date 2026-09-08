@@ -128,11 +128,11 @@ alguém de fora testar) seguindo só o README.
 Pré-requisito: Wave 5 completa (a imagem já reproduzível é a mesma que vai
 pra produção).
 
-| Etapa | Entrega | Critério de aceite |
-|---|---|---|
-| 6A — Stack Swarm | `docker stack deploy` usando a imagem do GHCR | Serviço `dmflow_*` aparece `Running` no `docker service ls` |
-| 6B — Traefik + domínio | `dmflow.arkitekt.space` com HTTPS | Site acessível via HTTPS, certificado válido |
-| 6C — Webhook produção | Webhook da Meta reapontado pra URL de produção | Evento real de comentário processado em produção, ponta a ponta |
+| Etapa | Entrega | Critério de aceite | Status |
+|---|---|---|---|
+| 6A — Stack Swarm | `docker stack deploy -c infra/docker-stack.yml dmflow` usando as imagens do GHCR | Serviço `dmflow_*` aparece `Running` no `docker service ls` | Arquivo pronto (`infra/docker-stack.yml`) — deploy real ainda não executado |
+| 6B — Traefik + domínio | `dmflow.arkitekt.space` (dashboard) + `hooks.arkitekt.space` (API/webhook) com HTTPS | Sites acessíveis via HTTPS, certificado válido | DNS já resolvendo (wildcard `*.arkitekt.space` existente); labels do Traefik já no stack, replicando o padrão de `letsencryptresolver` + rede `Arkitekt` usado pelos outros serviços da VPS |
+| 6C — Webhook produção | Webhook da Meta reapontado pra URL de produção | Evento real de comentário processado em produção, ponta a ponta | Pendente do deploy (6A) |
 
 ---
 

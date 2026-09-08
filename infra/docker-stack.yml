@@ -1,0 +1,133 @@
+# Stack de PRODUÇÃO para Docker Swarm — VPS arkitekt.space.
+# Diferente do docker-compose.yml da raiz (uso local/dev, usa `build:`),
+# este arquivo só usa imagens já publicadas no GHCR e labels do Traefik já
+# existentes na VPS (rede "Arkitekt", entrypoint "websecure", certresolver
+# "letsencryptresolver" — mesmo padrão dos outros serviços).
+#
+# Uso (rodar manualmente na VPS, nunca automatizado sem confirmação):
+#   docker stack deploy -c infra/docker-stack.yml dmflow
+
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - dmflow_postgres_data:/var/lib/postgresql/data
+    networks:
+      - dmflow_internal
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - dmflow_redis_data:/data
+    networks:
+      - dmflow_internal
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - dmflow_minio_data:/data
+    networks:
+      - dmflow_internal
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  migrate:
+    image: ghcr.io/ricardosoli777/dmflow-backend:latest
+    command: sh -c "npx prisma migrate deploy --schema=/app/node_modules/@dmflow/db/prisma/schema.prisma && node dist/seed.js"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      DASHBOARD_ADMIN_EMAIL: ${DASHBOARD_ADMIN_EMAIL}
+      DASHBOARD_ADMIN_PASSWORD: ${DASHBOARD_ADMIN_PASSWORD}
+    networks:
+      - dmflow_internal
+    deploy:
+      restart_policy:
+        # roda uma vez por deploy, não fica reiniciando em loop
+        condition: none
+
+  backend:
+    image: ghcr.io/ricardosoli777/dmflow-backend:latest
+    environment:
+      PORT: 4000
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      META_APP_SECRET: ${META_APP_SECRET}
+      META_VERIFY_TOKEN: ${META_VERIFY_TOKEN}
+      META_PAGE_ACCESS_TOKEN: ${META_PAGE_ACCESS_TOKEN}
+    networks:
+      - dmflow_internal
+      - Arkitekt
+    deploy:
+      restart_policy:
+        condition: on-failure
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=Arkitekt"
+        - "traefik.http.routers.dmflow-hooks.rule=Host(`hooks.arkitekt.space`)"
+        - "traefik.http.routers.dmflow-hooks.entrypoints=websecure"
+        - "traefik.http.routers.dmflow-hooks.tls.certresolver=letsencryptresolver"
+        - "traefik.http.routers.dmflow-hooks.service=dmflow-hooks"
+        - "traefik.http.services.dmflow-hooks.loadbalancer.server.port=4000"
+
+  worker:
+    image: ghcr.io/ricardosoli777/dmflow-worker:latest
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://redis:6379
+      META_PAGE_ACCESS_TOKEN: ${META_PAGE_ACCESS_TOKEN}
+      META_IG_USER_ID: ${META_IG_USER_ID}
+      META_GRAPH_API_VERSION: ${META_GRAPH_API_VERSION}
+    networks:
+      - dmflow_internal
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  frontend:
+    image: ghcr.io/ricardosoli777/dmflow-frontend:latest
+    environment:
+      NEXT_PUBLIC_API_URL: https://hooks.arkitekt.space
+    networks:
+      - Arkitekt
+    deploy:
+      restart_policy:
+        condition: on-failure
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=Arkitekt"
+        - "traefik.http.routers.dmflow.rule=Host(`dmflow.arkitekt.space`)"
+        - "traefik.http.routers.dmflow.entrypoints=websecure"
+        - "traefik.http.routers.dmflow.tls.certresolver=letsencryptresolver"
+        - "traefik.http.routers.dmflow.service=dmflow"
+        - "traefik.http.services.dmflow.loadbalancer.server.port=3000"
+
+networks:
+  # rede interna, só entre os serviços do DMFlow — não conversa com outras stacks
+  dmflow_internal:
+    driver: overlay
+  # rede já existente na VPS, usada pelo Traefik pra rotear todo mundo
+  Arkitekt:
+    external: true
+
+volumes:
+  dmflow_postgres_data:
+  dmflow_redis_data:
+  dmflow_minio_data:

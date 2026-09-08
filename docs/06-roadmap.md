@@ -32,7 +32,7 @@
 ## Fase 5 — Deploy na VPS
 - [ ] Dockerfile backend + frontend
 - [ ] Stack no Docker Swarm (`dmflow_backend`, `dmflow_frontend`, `dmflow_worker`)
-- [ ] Rota Traefik `dmflow.arkitekt.space`
+- [ ] Rota Traefik `dmflow.arkitekt.space` (dashboard) + `hooks.arkitekt.space` (API/webhook)
 - [ ] Bucket MinIO `dmflow` pra mídias
 - [ ] Configurar webhook da Meta apontando pra URL de produção
 

@@ -81,21 +81,36 @@ npm run dev:frontend
 
 Dashboard em `http://localhost:3000`, API em `http://localhost:4000`.
 
-## ☁️ Como fazer deploy numa VPS própria
+## ☁️ Deploy em produção (VPS arkitekt.space, Docker Swarm)
+
+A VPS já roda Traefik + Docker Swarm com outros serviços. O DMFlow usa um
+stack próprio, isolado, que só referencia as imagens já publicadas no GHCR
+(nada de build na VPS) e reaproveita a mesma rede/certresolver do Traefik
+que os outros serviços já usam — nenhum outro serviço é alterado.
+
+- **Dashboard:** `dmflow.arkitekt.space`
+- **API / Webhook:** `hooks.arkitekt.space` (o webhook da Meta aponta pra
+  `https://hooks.arkitekt.space/webhooks/instagram`)
+- **Stack file:** [`infra/docker-stack.yml`](infra/docker-stack.yml)
+
+```bash
+# na VPS, dentro da pasta do repositório, com o .env preenchido:
+docker stack deploy -c infra/docker-stack.yml dmflow
+```
+
+Isso **nunca é executado automaticamente** — é sempre um comando manual, pra
+não arriscar mexer nos outros serviços da VPS sem confirmação.
+
+### Deploy numa VPS própria diferente (sem Swarm)
 
 1. Instale Docker + Docker Compose na VPS.
-2. Clone o repositório na VPS.
-3. Copie `.env.example` para `.env` e preencha (use domínio real se for
-   expor publicamente, e configure o webhook da Meta apontando pra ele).
-4. Rode `./setup.sh` — ele puxa as imagens já publicadas em
-   `ghcr.io/ricardosoli777/dmflow-*` (geradas automaticamente pelo CI a cada
-   release, ver [`.github/workflows/release.yml`](.github/workflows/release.yml)),
-   então não precisa buildar nada na VPS.
-5. Coloque um proxy reverso com HTTPS na frente (Traefik/Nginx/Caddy)
-   apontando pro `frontend` (porta 3000) e pro `backend` (porta 4000, rota
-   `/webhooks/*` precisa ficar pública pra Meta conseguir chamar).
+2. Clone o repositório, copie `.env.example` → `.env` e preencha.
+3. Rode `./setup.sh` — puxa as imagens do GHCR, sem buildar nada na VPS.
+4. Coloque um proxy reverso com HTTPS (Traefik/Nginx/Caddy) na frente do
+   `frontend` (porta 3000) e do `backend` (porta 4000, rota `/webhooks/*`
+   precisa ficar pública pra Meta conseguir chamar).
 
-Guia completo e detalhado: [`docs/08-reprodutibilidade-docker-github.md`](docs/08-reprodutibilidade-docker-github.md).
+Guia completo: [`docs/08-reprodutibilidade-docker-github.md`](docs/08-reprodutibilidade-docker-github.md).
 
 ---
 
@@ -108,7 +123,8 @@ DMFlow/
 ├── frontend/           → Dashboard (Next.js + Tailwind + React Flow + Zustand)
 ├── packages/db/         → Schema Prisma compartilhado entre backend e worker
 ├── docs/                → Documentação completa (produto, arquitetura, plano, design system)
-├── docker-compose.yml     → Sobe tudo de uma vez
+├── infra/docker-stack.yml → Stack de produção (Docker Swarm + Traefik, VPS)
+├── docker-compose.yml     → Sobe tudo localmente (dev/uso pessoal com build)
 ├── .env.example            → Todas as variáveis necessárias, comentadas
 ├── setup.sh / setup.ps1     → Script de instalação guiada
 └── PROJECT-SPEC.md            → Requisitos funcionais/não funcionais com critério de aceite

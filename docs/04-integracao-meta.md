@@ -163,7 +163,7 @@ durante a configuração do app se ela é solicitada.
 
 ## Webhook: configuração
 
-- Endpoint: `https://dmflow.arkitekt.space/webhooks/instagram`
+- Endpoint: `https://hooks.arkitekt.space/webhooks/instagram`
 - Precisa responder ao **challenge de verificação** (`GET` com
   `hub.challenge`) na configuração inicial.
 - Assinar campos: `comments`, `messages`, `messaging_postbacks`.

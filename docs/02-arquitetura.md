@@ -71,7 +71,7 @@ Tabelas principais (rascunho):
 | Banco | Postgres (instância `pgvector` já existente, schema novo `dmflow`) |
 | Storage | MinIO (bucket novo `dmflow`) |
 | Frontend | Next.js + React Flow (lib de editor de grafo — usada até pelo próprio n8n) |
-| Deploy | Docker Swarm + Traefik, subdomínio `dmflow.arkitekt.space` |
+| Deploy | Docker Swarm + Traefik — `dmflow.arkitekt.space` (dashboard) e `hooks.arkitekt.space` (API/webhook) |
 
 ## Por que reaproveitar a VPS
 
