@@ -84,6 +84,35 @@ DASHBOARD_ADMIN_PASSWORD=troque_esta_senha
   — assim sempre existe uma imagem "conhecida boa" pra quem for clonar, em
   vez de depender do estado atual da `main`.
 
+## ⚠️ Deploy em VPS com outros serviços já rodando (Docker Swarm)
+
+Se você for rodar o `infra/docker-stack.yml` numa VPS que **já tem outros
+serviços** no mesmo Swarm/rede compartilhada (nosso caso: rede `Arkitekt` da
+arkitekt.space), preste atenção nisso — já nos mordeu uma vez:
+
+**O problema:** o `backend` e o `frontend` do DMFlow precisam estar na rede
+compartilhada (pra o Traefik conseguir rotear `dmflow.arkitekt.space` /
+`hooks.arkitekt.space`). Mas se você nomear o serviço de banco só de
+`postgres` (ou `redis`, `minio`), e **qualquer outra stack** naquela mesma
+rede também tiver um serviço com esse mesmo nome/alias, o DNS interno do
+Docker fica ambíguo — o backend pode acabar se conectando no banco **errado**
+(de outra stack!) em vez do seu, e o erro que aparece (`the provided
+database credentials ... are not valid`) parece que é senha errada, mas não
+é — é conexão no host errado.
+
+**Por isso** o `infra/docker-stack.yml` usa nomes prefixados
+(`dmflow-postgres`, `dmflow-redis`, `dmflow-minio`) em vez dos genéricos
+`postgres`/`redis`/`minio`. Se for adaptar esse arquivo pra outra VPS com
+outras stacks, **mantenha esse prefixo** (ou troque por outro único seu) —
+nunca use nomes genéricos de serviço de infra numa rede compartilhada.
+
+O `.env`/`.env.example` na raiz (usado pelo `docker-compose.yml` local, que
+não tem esse problema por rodar isolado) continua usando os nomes simples
+(`postgres`, `redis`, `minio`) — só o `DATABASE_URL`/`REDIS_URL` usados
+dentro do `infra/docker-stack.yml` (via variável de ambiente na VPS)
+precisam apontar pro nome prefixado (`@dmflow-postgres:5432`,
+`redis://dmflow-redis:6379`).
+
 ## Por que isso cumpre o objetivo de "outras pessoas sem conhecimento"
 
 - Ninguém precisa instalar Node, Postgres, Redis — só Docker.

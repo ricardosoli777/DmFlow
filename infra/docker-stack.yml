@@ -4,13 +4,22 @@
 # existentes na VPS (rede "Arkitekt", entrypoint "websecure", certresolver
 # "letsencryptresolver" — mesmo padrão dos outros serviços).
 #
+# IMPORTANTE: os serviços de infra (postgres/redis/minio) usam nomes
+# prefixados com "dmflow-" de propósito. "backend" e "frontend" precisam
+# estar na rede "Arkitekt" (compartilhada com outras stacks da VPS, pro
+# Traefik rotear) — um nome genérico tipo "postgres" colide com o DNS de
+# qualquer outro serviço na mesma rede que tenha esse alias (já aconteceu:
+# havia um serviço "postgres_postgres" de outra stack com alias "postgres"
+# nessa rede, e o backend passou a resolver pro banco errado). Nomes
+# prefixados evitam essa classe de bug.
+#
 # Uso (rodar manualmente na VPS, nunca automatizado sem confirmação):
 #   docker stack deploy -c infra/docker-stack.yml dmflow
 
 version: "3.8"
 
 services:
-  postgres:
+  dmflow-postgres:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -24,7 +33,7 @@ services:
       restart_policy:
         condition: on-failure
 
-  redis:
+  dmflow-redis:
     image: redis:7-alpine
     volumes:
       - dmflow_redis_data:/data
@@ -34,7 +43,7 @@ services:
       restart_policy:
         condition: on-failure
 
-  minio:
+  dmflow-minio:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
@@ -67,7 +76,7 @@ services:
     environment:
       PORT: 4000
       DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: redis://dmflow-redis:6379
       JWT_SECRET: ${JWT_SECRET}
       META_APP_SECRET: ${META_APP_SECRET}
       META_VERIFY_TOKEN: ${META_VERIFY_TOKEN}
@@ -91,7 +100,7 @@ services:
     image: ghcr.io/ricardosoli777/dmflow-worker:latest
     environment:
       DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: redis://dmflow-redis:6379
       META_PAGE_ACCESS_TOKEN: ${META_PAGE_ACCESS_TOKEN}
       META_IG_USER_ID: ${META_IG_USER_ID}
       META_GRAPH_API_VERSION: ${META_GRAPH_API_VERSION}
@@ -103,8 +112,6 @@ services:
 
   frontend:
     image: ghcr.io/ricardosoli777/dmflow-frontend:latest
-    environment:
-      NEXT_PUBLIC_API_URL: https://hooks.arkitekt.space
     networks:
       - Arkitekt
     deploy:
