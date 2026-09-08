@@ -28,9 +28,13 @@ async function ensureWithinWindow(igsid: string, logContent: string): Promise<bo
 
 /**
  * Envia uma DM de texto livre. Bloqueia (e loga, nunca falha silenciosamente)
- * se a última interação foi há mais de 24h — regra da Meta (RNF01).
+ * se a última interação foi há mais de 24h — regra da Meta (RNF01). Se
+ * `options` vier preenchido, anexa CTAs (quick replies) na mesma mensagem —
+ * não precisa de um node "Botões" separado só pra isso.
  */
-export async function sendDirectMessage(igsid: string, text: string): Promise<void> {
+export async function sendDirectMessage(igsid: string, text: string, options?: QuickReply[]): Promise<void> {
+  if (options?.length) return sendButtonsMessage(igsid, text, options);
+
   if (!(await ensureWithinWindow(igsid, text))) return;
 
   await callSend(igsid, { text });
@@ -57,20 +61,32 @@ export async function sendButtonsMessage(igsid: string, text: string, options: Q
 }
 
 /**
- * Envia mídia (imagem/áudio/vídeo) por URL pública.
+ * Envia mídia (imagem/áudio/vídeo) por URL pública. Se `options` vier
+ * preenchido, anexa CTAs (quick replies) na mesma mensagem — permite
+ * "imagem com botão" sem precisar de um node separado.
  */
 export async function sendMediaMessage(
   igsid: string,
   mediaType: "image" | "audio" | "video",
   url: string,
+  options?: QuickReply[],
 ): Promise<void> {
   if (!url) return;
   if (!(await ensureWithinWindow(igsid, `[${mediaType}] ${url}`))) return;
 
-  await callSend(igsid, {
+  const message: Record<string, unknown> = {
     attachment: { type: mediaType, payload: { url, is_reusable: true } },
-  });
-  await logOutbound(igsid, `[${mediaType}] ${url}`);
+  };
+  if (options?.length) {
+    message.quick_replies = options.slice(0, 13).map((o) => ({
+      content_type: "text",
+      title: o.title.slice(0, 20),
+      payload: o.payload,
+    }));
+  }
+
+  await callSend(igsid, message);
+  await logOutbound(igsid, `[${mediaType}] ${url}${options?.length ? ` [botões: ${options.map((o) => o.title).join(", ")}]` : ""}`);
 }
 
 /**
@@ -80,6 +96,16 @@ export async function sendMediaMessage(
 export async function sendPrivateReply(commentId: string, text: string): Promise<void> {
   const settings = await getMetaSettings();
   await callGraphApi(settings, `/${commentId}/private_replies`, { message: text });
+}
+
+/**
+ * Responde publicamente ao comentário (visível pra todo mundo, não é DM).
+ * Usado opcionalmente antes de abrir o fluxo de DM, se o trigger tiver uma
+ * resposta pública configurada.
+ */
+export async function sendPublicCommentReply(commentId: string, text: string): Promise<void> {
+  const settings = await getMetaSettings();
+  await callGraphApi(settings, `/${commentId}/replies`, { message: text });
 }
 
 function isWithinMessagingWindow(lastInboundAt: Date | null): boolean {

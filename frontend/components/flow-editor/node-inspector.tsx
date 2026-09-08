@@ -79,10 +79,10 @@ export function NodeInspector() {
         </label>
       )}
 
-      {type === "buttons" && (
+      {["buttons", "message", "image", "audio", "video"].includes(type) && (
         <div className="flex flex-col gap-2 text-sm">
           <div className="flex items-center justify-between">
-            <span>Botões (CTA)</span>
+            <span>Botões (CTA) — opcional</span>
             <Button size="sm" variant="ghost" onClick={addOption}>
               <Plus size={14} /> Adicionar
             </Button>

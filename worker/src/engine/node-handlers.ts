@@ -27,35 +27,46 @@ type HandlerArgs = {
 
 // RF05 — um handler por tipo de node, testável isoladamente.
 export const nodeHandlers: Record<FlowNode["type"], (args: HandlerArgs) => Promise<NodeResult>> = {
+  // CTA opcional em qualquer node de conteúdo (message/image/audio/video):
+  // se tiver `options`, a mensagem sai com botões e o fluxo espera o clique
+  // (postback) em vez de seguir direto pro `next` — mesmo comportamento do
+  // node "Botões" dedicado, só que embutido.
   message: async ({ node, contact }) => {
-    await sendDirectMessage(contact.igsid, String(node.text ?? ""));
-    return { nextNodeId: (node.next as string) ?? null, waitingForInput: false };
+    const options = toQuickReplies(node.options);
+    await sendDirectMessage(contact.igsid, String(node.text ?? ""), options);
+    return options.length
+      ? { nextNodeId: null, waitingForInput: true }
+      : { nextNodeId: (node.next as string) ?? null, waitingForInput: false };
   },
 
   buttons: async ({ node, contact }) => {
-    const options = (node.options as ButtonOption[] | undefined) ?? [];
-    await sendButtonsMessage(
-      contact.igsid,
-      String(node.text ?? ""),
-      options.map((o) => ({ title: o.label, payload: o.next })),
-    );
+    await sendButtonsMessage(contact.igsid, String(node.text ?? ""), toQuickReplies(node.options));
     // Próximo node é resolvido via postback quando o usuário clica (ver resolve-event.ts)
     return { nextNodeId: null, waitingForInput: true };
   },
 
   image: async ({ node, contact }) => {
-    await sendMediaMessage(contact.igsid, "image", String(node.url ?? ""));
-    return { nextNodeId: (node.next as string) ?? null, waitingForInput: false };
+    const options = toQuickReplies(node.options);
+    await sendMediaMessage(contact.igsid, "image", String(node.url ?? ""), options);
+    return options.length
+      ? { nextNodeId: null, waitingForInput: true }
+      : { nextNodeId: (node.next as string) ?? null, waitingForInput: false };
   },
 
   audio: async ({ node, contact }) => {
-    await sendMediaMessage(contact.igsid, "audio", String(node.url ?? ""));
-    return { nextNodeId: (node.next as string) ?? null, waitingForInput: false };
+    const options = toQuickReplies(node.options);
+    await sendMediaMessage(contact.igsid, "audio", String(node.url ?? ""), options);
+    return options.length
+      ? { nextNodeId: null, waitingForInput: true }
+      : { nextNodeId: (node.next as string) ?? null, waitingForInput: false };
   },
 
   video: async ({ node, contact }) => {
-    await sendMediaMessage(contact.igsid, "video", String(node.url ?? ""));
-    return { nextNodeId: (node.next as string) ?? null, waitingForInput: false };
+    const options = toQuickReplies(node.options);
+    await sendMediaMessage(contact.igsid, "video", String(node.url ?? ""), options);
+    return options.length
+      ? { nextNodeId: null, waitingForInput: true }
+      : { nextNodeId: (node.next as string) ?? null, waitingForInput: false };
   },
 
   delay: async ({ node }) => {
@@ -107,3 +118,8 @@ export const nodeHandlers: Record<FlowNode["type"], (args: HandlerArgs) => Promi
     return { nextNodeId: null, waitingForInput: false };
   },
 };
+
+function toQuickReplies(options: unknown): { title: string; payload: string }[] {
+  const list = (options as ButtonOption[] | undefined) ?? [];
+  return list.filter((o) => o.label && o.next).map((o) => ({ title: o.label, payload: o.next }));
+}

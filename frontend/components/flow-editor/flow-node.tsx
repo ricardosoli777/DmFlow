@@ -79,7 +79,7 @@ export function FlowNode({ id, data, selected }: NodeProps<NodeData>) {
 
       {preview && <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">{preview}</p>}
 
-      {data.type === "buttons" && data.options && data.options.length > 0 && (
+      {data.options && data.options.length > 0 && (
         <div className="mt-2 flex flex-col gap-1">
           {data.options.map((opt, i) => (
             <div
