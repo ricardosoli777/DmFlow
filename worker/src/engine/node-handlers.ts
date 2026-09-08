@@ -1,10 +1,13 @@
 import type { Contact, FlowRun } from "@dmflow/db";
 import { getPrisma } from "@dmflow/db";
+import type { ButtonAction } from "../services/instagram";
 import { sendButtonsMessage, sendDirectMessage, sendMediaMessage } from "../services/instagram";
 
 const prisma = getPrisma();
 
-export type ButtonOption = { label: string; next: string };
+// `next` liga o botão a outro node do fluxo (postback); `url` abre um link
+// externo direto no cliente — mutuamente exclusivos, um ou outro por botão.
+export type ButtonOption = { label: string; next?: string; url?: string };
 
 export type FlowNode = {
   id: string;
@@ -32,39 +35,44 @@ export const nodeHandlers: Record<FlowNode["type"], (args: HandlerArgs) => Promi
   // (postback) em vez de seguir direto pro `next` — mesmo comportamento do
   // node "Botões" dedicado, só que embutido.
   message: async ({ node, contact }) => {
-    const options = toQuickReplies(node.options);
-    await sendDirectMessage(contact.igsid, String(node.text ?? ""), options);
-    return options.length
+    const actions = toButtonActions(node.options);
+    await sendDirectMessage(contact.igsid, String(node.text ?? ""), actions);
+    return hasPostback(actions)
       ? { nextNodeId: null, waitingForInput: true }
       : { nextNodeId: (node.next as string) ?? null, waitingForInput: false };
   },
 
   buttons: async ({ node, contact }) => {
-    await sendButtonsMessage(contact.igsid, String(node.text ?? ""), toQuickReplies(node.options));
-    // Próximo node é resolvido via postback quando o usuário clica (ver resolve-event.ts)
-    return { nextNodeId: null, waitingForInput: true };
+    const actions = toButtonActions(node.options);
+    await sendButtonsMessage(contact.igsid, String(node.text ?? ""), actions);
+    // Se algum botão for postback, o próximo node é resolvido via clique
+    // (ver resolve-event.ts). Se só houver botões de link externo, segue
+    // direto pro `next` do node, já que nenhum clique volta pro webhook.
+    return hasPostback(actions)
+      ? { nextNodeId: null, waitingForInput: true }
+      : { nextNodeId: (node.next as string) ?? null, waitingForInput: false };
   },
 
   image: async ({ node, contact }) => {
-    const options = toQuickReplies(node.options);
-    await sendMediaMessage(contact.igsid, "image", String(node.url ?? ""), options);
-    return options.length
+    const actions = toButtonActions(node.options);
+    await sendMediaMessage(contact.igsid, "image", String(node.url ?? ""), actions);
+    return hasPostback(actions)
       ? { nextNodeId: null, waitingForInput: true }
       : { nextNodeId: (node.next as string) ?? null, waitingForInput: false };
   },
 
   audio: async ({ node, contact }) => {
-    const options = toQuickReplies(node.options);
-    await sendMediaMessage(contact.igsid, "audio", String(node.url ?? ""), options);
-    return options.length
+    const actions = toButtonActions(node.options);
+    await sendMediaMessage(contact.igsid, "audio", String(node.url ?? ""), actions);
+    return hasPostback(actions)
       ? { nextNodeId: null, waitingForInput: true }
       : { nextNodeId: (node.next as string) ?? null, waitingForInput: false };
   },
 
   video: async ({ node, contact }) => {
-    const options = toQuickReplies(node.options);
-    await sendMediaMessage(contact.igsid, "video", String(node.url ?? ""), options);
-    return options.length
+    const actions = toButtonActions(node.options);
+    await sendMediaMessage(contact.igsid, "video", String(node.url ?? ""), actions);
+    return hasPostback(actions)
       ? { nextNodeId: null, waitingForInput: true }
       : { nextNodeId: (node.next as string) ?? null, waitingForInput: false };
   },
@@ -119,7 +127,17 @@ export const nodeHandlers: Record<FlowNode["type"], (args: HandlerArgs) => Promi
   },
 };
 
-function toQuickReplies(options: unknown): { title: string; payload: string }[] {
+function toButtonActions(options: unknown): ButtonAction[] {
   const list = (options as ButtonOption[] | undefined) ?? [];
-  return list.filter((o) => o.label && o.next).map((o) => ({ title: o.label, payload: o.next }));
+  return list
+    .filter((o) => o.label && (o.next || o.url))
+    .map((o) =>
+      o.url
+        ? { type: "url", title: o.label, url: o.url }
+        : { type: "next", title: o.label, payload: o.next as string },
+    );
+}
+
+function hasPostback(actions: ButtonAction[]): boolean {
+  return actions.some((a) => a.type === "next");
 }

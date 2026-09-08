@@ -4,7 +4,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { useFlowEditorStore } from "@/stores/flow-editor.store";
 import { Button } from "@/components/ui/button";
 
-type ButtonOption = { label: string; next: string };
+type ButtonOption = { label: string; next?: string; url?: string };
 
 const selectClass =
   "rounded-[var(--radius)] border border-border bg-background p-2 text-sm outline-none focus:ring-2 focus:ring-primary";
@@ -36,6 +36,12 @@ export function NodeInspector() {
   function addOption() {
     if (!node) return;
     updateNodeData(node.id, { options: [...options, { label: "", next: "" }] });
+  }
+
+  function setOptionAction(index: number, action: "next" | "url") {
+    // Um botão só tem uma ação: ou vai pra outro node (postback), ou abre
+    // um link externo — trocar o tipo limpa o campo que não se aplica mais.
+    updateOption(index, action === "url" ? { next: undefined, url: "" } : { url: undefined, next: "" });
   }
 
   function removeOption(index: number) {
@@ -107,20 +113,42 @@ export function NodeInspector() {
               </div>
               <select
                 className="rounded-[var(--radius)] border border-border bg-background p-1.5 text-xs outline-none focus:ring-2 focus:ring-primary"
-                value={opt.next}
-                onChange={(e) => updateOption(i, { next: e.target.value })}
+                value={opt.url !== undefined ? "url" : "next"}
+                onChange={(e) => setOptionAction(i, e.target.value as "next" | "url")}
               >
-                <option value="">Vai para... (escolha um node)</option>
-                {otherNodes.map((n) => (
-                  <option key={n.id} value={n.id}>
-                    {(n.data.label as string) ?? n.id}
-                  </option>
-                ))}
+                <option value="next">Vai para node do fluxo</option>
+                <option value="url">Abre link externo (URL)</option>
               </select>
+              {opt.url !== undefined ? (
+                <input
+                  className="rounded-[var(--radius)] border border-border bg-background p-1.5 text-xs outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="https://..."
+                  value={opt.url}
+                  onChange={(e) => updateOption(i, { url: e.target.value })}
+                />
+              ) : (
+                <select
+                  className="rounded-[var(--radius)] border border-border bg-background p-1.5 text-xs outline-none focus:ring-2 focus:ring-primary"
+                  value={opt.next ?? ""}
+                  onChange={(e) => updateOption(i, { next: e.target.value })}
+                >
+                  <option value="">Vai para... (escolha um node)</option>
+                  {otherNodes.map((n) => (
+                    <option key={n.id} value={n.id}>
+                      {(n.data.label as string) ?? n.id}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           ))}
           {options.length === 0 && (
             <p className="text-xs text-muted-foreground">Nenhum botão ainda — clique em &ldquo;Adicionar&rdquo;.</p>
+          )}
+          {options.some((o) => o.url !== undefined) && (
+            <p className="text-xs text-muted-foreground">
+              Com botão de link externo, a Meta limita a 3 botões por mensagem (mistura link + node é permitida).
+            </p>
           )}
         </div>
       )}

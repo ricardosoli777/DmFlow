@@ -1,5 +1,6 @@
 import {
   Clock,
+  ExternalLink,
   GitBranch,
   Image as ImageIcon,
   MessageSquare,
@@ -29,7 +30,7 @@ const icons: Record<FlowNodeType, typeof MessageSquare> = {
   end: StopCircle,
 };
 
-type ButtonOption = { label: string; next: string };
+type ButtonOption = { label: string; next?: string; url?: string };
 
 type NodeData = {
   type: FlowNodeType;
@@ -84,9 +85,10 @@ export function FlowNode({ id, data, selected }: NodeProps<NodeData>) {
           {data.options.map((opt, i) => (
             <div
               key={i}
-              className="truncate rounded-full border border-border bg-muted px-2 py-0.5 text-center text-xs"
+              className="flex items-center justify-center gap-1 truncate rounded-full border border-border bg-muted px-2 py-0.5 text-center text-xs"
             >
-              {opt.label || "(sem texto)"}
+              {opt.url !== undefined && <ExternalLink size={10} className="shrink-0" />}
+              <span className="truncate">{opt.label || "(sem texto)"}</span>
             </div>
           ))}
         </div>

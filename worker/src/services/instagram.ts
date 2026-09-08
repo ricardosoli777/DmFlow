@@ -11,7 +11,22 @@ class MessagingWindowClosedError extends Error {
   }
 }
 
-type QuickReply = { title: string; payload: string };
+/**
+ * Ação de um botão/CTA: `next` dispara um postback (o worker resolve o
+ * próximo node — ver resolve-event.ts); `url` abre um link externo direto
+ * no cliente do Instagram, sem passar pelo webhook.
+ */
+export type ButtonAction =
+  | { type: "next"; title: string; payload: string }
+  | { type: "url"; title: string; url: string };
+
+type QuickReply = ButtonAction;
+
+function toGraphButton(action: ButtonAction): Record<string, string> {
+  return action.type === "url"
+    ? { type: "web_url", title: action.title.slice(0, 20), url: action.url }
+    : { type: "postback", title: action.title.slice(0, 20), payload: action.payload };
+}
 
 async function ensureWithinWindow(igsid: string, logContent: string): Promise<boolean> {
   const contact = await prisma.contact.findUniqueOrThrow({ where: { igsid } });
@@ -42,28 +57,46 @@ export async function sendDirectMessage(igsid: string, text: string, options?: Q
 }
 
 /**
- * Envia mensagem com botões (quick replies) — até 13 opções, cada uma com
- * um payload que o worker usa pra saber qual node seguir (ver
- * resolve-event.ts / node-handlers.ts).
+ * Envia mensagem com botões. Se todas as opções forem `next` (postback), usa
+ * quick replies (até 13). Se alguma opção for `url` (link externo), a Meta
+ * exige um button template em vez de quick reply — nesse caso o limite cai
+ * pra 3 botões (mistura postback + web_url é permitida no mesmo template).
  */
 export async function sendButtonsMessage(igsid: string, text: string, options: QuickReply[]): Promise<void> {
   if (!(await ensureWithinWindow(igsid, text))) return;
 
-  await callSend(igsid, {
-    text,
-    quick_replies: options.slice(0, 13).map((o) => ({
-      content_type: "text",
-      title: o.title.slice(0, 20),
-      payload: o.payload,
-    })),
-  });
+  const hasUrl = options.some((o) => o.type === "url");
+  if (hasUrl) {
+    await callSend(igsid, {
+      attachment: {
+        type: "template",
+        payload: {
+          template_type: "button",
+          text: text.slice(0, 640),
+          buttons: options.slice(0, 3).map(toGraphButton),
+        },
+      },
+    });
+  } else {
+    await callSend(igsid, {
+      text,
+      quick_replies: options.slice(0, 13).map((o) => ({
+        content_type: "text",
+        title: o.title.slice(0, 20),
+        payload: o.type === "next" ? o.payload : "",
+      })),
+    });
+  }
   await logOutbound(igsid, `${text} [botões: ${options.map((o) => o.title).join(", ")}]`);
 }
 
 /**
  * Envia mídia (imagem/áudio/vídeo) por URL pública. Se `options` vier
- * preenchido, anexa CTAs (quick replies) na mesma mensagem — permite
- * "imagem com botão" sem precisar de um node separado.
+ * preenchido, anexa CTAs na mesma mensagem — permite "imagem com botão"
+ * sem precisar de um node separado. Se alguma opção for `url` (link
+ * externo), a Meta não permite misturar anexo de mídia com button
+ * template na mesma mensagem, então os botões saem numa mensagem
+ * separada logo em seguida.
  */
 export async function sendMediaMessage(
   igsid: string,
@@ -74,19 +107,33 @@ export async function sendMediaMessage(
   if (!url) return;
   if (!(await ensureWithinWindow(igsid, `[${mediaType}] ${url}`))) return;
 
+  const hasUrl = options?.some((o) => o.type === "url") ?? false;
   const message: Record<string, unknown> = {
     attachment: { type: mediaType, payload: { url, is_reusable: true } },
   };
-  if (options?.length) {
+  if (options?.length && !hasUrl) {
     message.quick_replies = options.slice(0, 13).map((o) => ({
       content_type: "text",
       title: o.title.slice(0, 20),
-      payload: o.payload,
+      payload: o.type === "next" ? o.payload : "",
     }));
   }
 
   await callSend(igsid, message);
   await logOutbound(igsid, `[${mediaType}] ${url}${options?.length ? ` [botões: ${options.map((o) => o.title).join(", ")}]` : ""}`);
+
+  if (hasUrl) {
+    await callSend(igsid, {
+      attachment: {
+        type: "template",
+        payload: {
+          template_type: "button",
+          text: "Escolha uma opção:",
+          buttons: options!.slice(0, 3).map(toGraphButton),
+        },
+      },
+    });
+  }
 }
 
 /**
