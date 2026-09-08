@@ -18,7 +18,7 @@ JSON. Cada contato tem um `flow_run` que aponta pro node atual + um contexto
     },
     { "id": "n3", "type": "tag", "tag": "cliente", "next": "n5" },
     { "id": "n4", "type": "capture", "field": "email", "prompt": "Qual seu e-mail?", "next": "n5" },
-    { "id": "n5", "type": "webhook", "url": "https://api-evocrm.arkitekt.space/...", "next": "n6" },
+    { "id": "n5", "type": "webhook", "url": "https://api.crm.example.com/...", "next": "n6" },
     { "id": "n6", "type": "message", "text": "Prontinho! ✅" }
   ],
   "start": "n1"
@@ -35,7 +35,7 @@ JSON. Cada contato tem um `flow_run` que aponta pro node atual + um contexto
 | `condition` | Ramifica com base em atributo/tag do contato |
 | `capture` | Espera resposta livre do usuário e salva num campo do contato |
 | `tag` | Adiciona/remove tag do contato |
-| `webhook` | Chama uma URL externa (ex: EvoAI CRM, planilha, Zapman) |
+| `webhook` | Chama uma URL externa (ex: CRM, planilha, automação) |
 | `end` | Encerra o flow_run |
 
 ## Execução

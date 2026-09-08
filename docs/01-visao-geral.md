@@ -33,7 +33,7 @@ Manualmente isso é inviável em escala — o DMFlow automatiza:
 - Envio de DM privado inicial
 - Fluxo com: mensagem de texto, mensagem com botões (quick replies), delay,
   condição simples (se clicou X vai pra Y), captura de dado (nome/telefone/email),
-  tag de contato, webhook de saída (integrar com EvoAI CRM/CRM externo)
+  tag de contato, webhook de saída (integrar com CRM externo)
 - Dashboard: criar/editar fluxos, listar triggers ativos, ver conversas,
   métricas básicas (comentários capturados, DMs enviados, taxa de conclusão do funil)
 

@@ -26,14 +26,15 @@ visualmente no dashboard, sem escrever código.
 3. Rode o script de setup:
    - **Windows:** clique com o botão direito em `setup.ps1` → "Executar com PowerShell"
    - **Mac/Linux:** abra o terminal na pasta e rode `./setup.sh`
-4. Na primeira vez, ele vai criar um arquivo `.env` e pedir pra você
-   preenchê-lo. Abra o `.env` num editor de texto e preencha:
-   - As credenciais do Meta (veja onde pegar cada uma logo abaixo, ou o
-     detalhe completo em [`docs/04-integracao-meta.md`](docs/04-integracao-meta.md))
-   - Um e-mail/senha de sua escolha pra ser o login do dashboard
+4. Na primeira vez, ele vai criar um arquivo `.env` só com a infraestrutura
+   (banco, fila, storage) e o login inicial do dashboard — não precisa mais
+   preencher nenhuma credencial da Meta aqui.
 5. Rode o script de novo. Ele vai baixar as imagens prontas e subir tudo.
-6. Acesse **http://localhost:3000** e faça login com o e-mail/senha que você
-   definiu no `.env`.
+6. Acesse **http://localhost:3000**, faça login com o e-mail/senha que você
+   definiu no `.env` e vá em **Configurações** (`/settings`) pra colar as
+   credenciais da sua conta Meta/Instagram (veja onde pegar cada uma logo
+   abaixo). Elas ficam guardadas no banco de dados do próprio app — cada
+   pessoa que for rodar o DMFlow usa as suas, sem editar arquivo nenhum.
 
 Isso sobe: banco de dados, fila, armazenamento de arquivos, API, worker
 (motor de automação) e o dashboard — tudo junto, isolado, sem precisar
@@ -41,17 +42,17 @@ instalar Node, Postgres ou qualquer outra coisa manualmente.
 
 ### 🔑 Onde pegar cada credencial da Meta
 
-Use o [`credenciais.txt`](credenciais.txt) como rascunho (não vai pro
-GitHub) e depois copie pro `.env`. Passo a passo completo, com telas e
-nomes de menu, em [`docs/04-integracao-meta.md`](docs/04-integracao-meta.md#-passo-a-passo-onde-pegar-cada-credencial).
+Cole cada uma direto no dashboard, em **Configurações** (`/settings`) —
+tem um tooltip passo a passo em cada campo. Passo a passo completo, com
+telas e nomes de menu, em [`docs/04-integracao-meta.md`](docs/04-integracao-meta.md#-passo-a-passo-onde-pegar-cada-credencial).
 Resumo:
 
-| Variável | Onde pegar |
+| Campo em Configurações | Onde pegar |
 |---|---|
-| `META_APP_ID` / `META_APP_SECRET` | developers.facebook.com/apps → seu app → **Configurações do app → Básico** |
-| `META_PAGE_ACCESS_TOKEN` | Dentro do app → **Adicionar produto → Instagram → Instagram API setup** → etapa "Generate access tokens" |
-| `META_IG_USER_ID` | **Ferramentas → Graph API Explorer** → `GET /me/accounts?fields=instagram_business_account` |
-| `META_VERIFY_TOKEN` | Você mesmo inventa (senha aleatória) — usa o mesmo valor ao configurar o Webhook no app |
+| **App ID** / **App Secret** | developers.facebook.com/apps → seu app → **Configurações do app → Básico** |
+| **Token de acesso da página** | Dentro do app → **Adicionar produto → Instagram → Instagram API setup** → etapa "Generate access tokens" |
+| **ID da conta Instagram** | **Ferramentas → Graph API Explorer** → `GET /me/accounts?fields=instagram_business_account` |
+| **Token de verificação do webhook** | Você mesmo inventa (senha aleatória) — usa o mesmo valor ao configurar o Webhook no app |
 
 Antes de tudo isso: a conta Instagram precisa ser **Business** e estar
 vinculada a uma **Página do Facebook** (Instagram → Configurações → Contas
@@ -83,16 +84,16 @@ npm run dev:frontend
 
 Dashboard em `http://localhost:3000`, API em `http://localhost:4000`.
 
-## ☁️ Deploy em produção (VPS arkitekt.space, Docker Swarm)
+## ☁️ Deploy em produção (VPS própria, Docker Swarm)
 
-A VPS já roda Traefik + Docker Swarm com outros serviços. O DMFlow usa um
+Se a VPS já roda Traefik + Docker Swarm com outros serviços, o DMFlow usa um
 stack próprio, isolado, que só referencia as imagens já publicadas no GHCR
 (nada de build na VPS) e reaproveita a mesma rede/certresolver do Traefik
 que os outros serviços já usam — nenhum outro serviço é alterado.
 
-- **Dashboard:** `dmflow.arkitekt.space`
-- **API / Webhook:** `hooks.arkitekt.space` (o webhook da Meta aponta pra
-  `https://hooks.arkitekt.space/webhooks/instagram`)
+- **Dashboard:** `dmflow.example.com` (troque pelo seu domínio)
+- **API / Webhook:** `hooks.example.com` (o webhook da Meta aponta pra
+  `https://hooks.example.com/webhooks/instagram`)
 - **Stack file:** [`infra/docker-stack.yml`](infra/docker-stack.yml)
 
 ```bash
@@ -173,15 +174,16 @@ DMFlow/
     capturar, tag, webhook, fim)
   - Nodes mostram o conteúdo configurado direto no card; exclusão via
     tecla Delete ou ícone no próprio node
-  - `/settings` — conexão Instagram gerenciável pelo dashboard (com
-    passo a passo em cada campo), não só via `.env`
+  - `/settings` — credenciais da Meta/Instagram configuradas direto pelo
+    dashboard (com passo a passo em cada campo), guardadas no banco —
+    não usa mais `.env` pra isso
   - `/triggers` — formulário real de criação (post + palavra-chave + fluxo)
   - Pendente: agendamento real do node "Aguardar" (fila com atraso), upload
     de mídia por arrastar-e-soltar (hoje é só URL), edição de texto inline
     no canvas
-- ✅ **Wave 6 — no ar em produção:** https://dmflow.arkitekt.space
-  (dashboard) e https://hooks.arkitekt.space (API/webhook), rodando via
-  Docker Swarm na VPS arkitekt.space
+- ✅ **Wave 6 — no ar em produção:** https://dmflow.example.com
+  (dashboard) e https://hooks.example.com (API/webhook), rodando via
+  Docker Swarm numa VPS própria
 
 Ver [`docs/07-plano-waves-spec-driven.md`](docs/07-plano-waves-spec-driven.md)
 pro estado detalhado de cada etapa.

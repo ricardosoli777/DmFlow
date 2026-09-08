@@ -32,7 +32,7 @@ Fonte de verdade pro loop SPEC→PLAN→EXECUTE→VERIFY de cada wave
 | RNF04 | Auditoria | Todo evento bruto recebido da Meta é persistido em `events_raw`, permitindo replay |
 | RNF05 | Reprodutibilidade total | Clone limpo do repo + Docker sobe o app funcional sem instalar Node/Postgres/Redis manualmente |
 | RNF06 | Onboarding leigo | Pessoa sem conhecimento técnico segue só o `README.md` e sobe o app em até 15 minutos |
-| RNF07 | Sem exposição de segredos | Nenhuma credencial committada no repositório público; tudo via `.env` |
+| RNF07 | Sem exposição de segredos | Nenhuma credencial committada no repositório público; credenciais de infra via `.env`, credenciais da Meta configuradas por cada usuário em **Configurações**, guardadas no banco |
 | RNF08 | Observabilidade mínima | Logs estruturados suficientes para diagnosticar falha de envio de DM sem acesso ao código |
 
 ## Fora de escopo (v1)

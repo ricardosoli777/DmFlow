@@ -80,7 +80,7 @@ Pré-requisito: Wave 1 completa + Wave 0.3 (app Meta configurado).
   Nenhum DM foi enviado porque não havia trigger cadastrado pro post de
   teste (comportamento correto, RF02).
 - ⏳ **Falta só:** configurar a URL do webhook no painel da Meta
-  (`https://hooks.arkitekt.space/webhooks/instagram` + o verify token) e
+  (`https://hooks.example.com/webhooks/instagram` + o verify token) e
   testar com um comentário real, numa conta/post de verdade — só isso
   depende de uma ação manual sua no painel da Meta, não de código.
 
@@ -132,7 +132,7 @@ alguém de fora testar) seguindo só o README.
 
 ---
 
-## Wave 6 — Deploy em Produção (VPS arkitekt.space)
+## Wave 6 — Deploy em Produção (VPS própria)
 
 Pré-requisito: Wave 5 completa (a imagem já reproduzível é a mesma que vai
 pra produção).
@@ -140,8 +140,8 @@ pra produção).
 | Etapa | Entrega | Critério de aceite | Status |
 |---|---|---|---|
 | 6A — Stack Swarm | `docker stack deploy -c infra/docker-stack.yml dmflow` usando as imagens do GHCR | Serviço `dmflow_*` aparece `Running` no `docker service ls` | ✅ Feito — todos os 7 serviços `1/1` (migrate `0/1` é esperado, roda uma vez e conclui) |
-| 6B — Traefik + domínio | `dmflow.arkitekt.space` (dashboard) + `hooks.arkitekt.space` (API/webhook) com HTTPS | Sites acessíveis via HTTPS, certificado válido | ✅ Confirmado: `dmflow.arkitekt.space` → HTTP 200, `hooks.arkitekt.space/health` → HTTP 200 |
-| 6C — Webhook produção | Webhook da Meta reapontado pra URL de produção | Evento real de comentário processado em produção, ponta a ponta | Pendente — falta configurar o webhook no painel da Meta apontando pra `https://hooks.arkitekt.space/webhooks/instagram` (passo 3 do "klead - IG") |
+| 6B — Traefik + domínio | `dmflow.example.com` (dashboard) + `hooks.example.com` (API/webhook) com HTTPS | Sites acessíveis via HTTPS, certificado válido | ✅ Confirmado: `dmflow.example.com` → HTTP 200, `hooks.example.com/health` → HTTP 200 |
+| 6C — Webhook produção | Webhook da Meta reapontado pra URL de produção | Evento real de comentário processado em produção, ponta a ponta | Pendente — falta configurar o webhook no painel da Meta apontando pra `https://hooks.example.com/webhooks/instagram` |
 
 ### Bugs corrigidos no deploy real (não apareciam em build local)
 

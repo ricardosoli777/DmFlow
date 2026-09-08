@@ -68,14 +68,14 @@ Tabelas principais (rascunho):
 |---|---|
 | Backend/API | Node.js (NestJS ou Fastify) — bom suporte a webhooks e filas |
 | Fila | Redis + BullMQ (Redis já roda na VPS) |
-| Banco | Postgres (instância `pgvector` já existente, schema novo `dmflow`) |
+| Banco | Postgres (instância dedicada ou compartilhada, schema `dmflow`) |
 | Storage | MinIO (bucket novo `dmflow`) |
 | Frontend | Next.js + React Flow (lib de editor de grafo — usada até pelo próprio n8n) |
-| Deploy | Docker Swarm + Traefik — `dmflow.arkitekt.space` (dashboard) e `hooks.arkitekt.space` (API/webhook) |
+| Deploy | Docker Swarm + Traefik — `dmflow.example.com` (dashboard) e `hooks.example.com` (API/webhook) |
 
 ## Por que reaproveitar a VPS
 
-Você já tem Postgres, Redis (via EvoAI), MinIO, Traefik e Swarm rodando e
-monitorados (backup, fail2ban, health-check). Subir o DMFlow como mais um
-stack Swarm evita provisionar infra nova — só precisa de um schema/bucket
-isolado e um novo serviço no Swarm.
+Se você já tem Postgres, Redis, MinIO, Traefik e Swarm rodando e
+monitorados (backup, fail2ban, health-check) numa VPS própria, subir o
+DMFlow como mais um stack Swarm evita provisionar infra nova — só precisa
+de um schema/bucket isolado e um novo serviço no Swarm.

@@ -73,9 +73,9 @@ DASHBOARD_ADMIN_PASSWORD=troque_esta_senha
 3. Abra a pasta e rode:
    - Windows: clique duas vezes em `setup.ps1` (ou rode no PowerShell)
    - Mac/Linux: `./setup.sh`
-4. Preencha o arquivo `.env` com suas credenciais do Meta (veja o guia em `docs/04-integracao-meta.md`)
-5. Rode o script de novo (ele detecta o `.env` preenchido e sobe tudo)
-6. Acesse http://localhost:3000
+4. Rode o script de novo — ele sobe tudo com o `.env` só de infraestrutura
+5. Acesse http://localhost:3000, faça login e cole suas credenciais do Meta
+   em **Configurações** (veja o guia em `docs/04-integracao-meta.md`)
 ```
 
 ### 7. Release versionada
@@ -87,12 +87,13 @@ DASHBOARD_ADMIN_PASSWORD=troque_esta_senha
 ## ⚠️ Deploy em VPS com outros serviços já rodando (Docker Swarm)
 
 Se você for rodar o `infra/docker-stack.yml` numa VPS que **já tem outros
-serviços** no mesmo Swarm/rede compartilhada (nosso caso: rede `Arkitekt` da
-arkitekt.space), preste atenção nisso — já nos mordeu uma vez:
+serviços** no mesmo Swarm/rede compartilhada (ex: uma rede `minha-rede`
+usada por várias stacks), preste atenção nisso — já mordeu um deploy real
+uma vez:
 
 **O problema:** o `backend` e o `frontend` do DMFlow precisam estar na rede
-compartilhada (pra o Traefik conseguir rotear `dmflow.arkitekt.space` /
-`hooks.arkitekt.space`). Mas se você nomear o serviço de banco só de
+compartilhada (pra o Traefik conseguir rotear `dmflow.example.com` /
+`hooks.example.com`). Mas se você nomear o serviço de banco só de
 `postgres` (ou `redis`, `minio`), e **qualquer outra stack** naquela mesma
 rede também tiver um serviço com esse mesmo nome/alias, o DNS interno do
 Docker fica ambíguo — o backend pode acabar se conectando no banco **errado**
@@ -117,8 +118,9 @@ precisam apontar pro nome prefixado (`@dmflow-postgres:5432`,
 
 - Ninguém precisa instalar Node, Postgres, Redis — só Docker.
 - Ninguém precisa buildar nada — a imagem já vem pronta do GHCR.
-- Único trabalho manual real é preencher credenciais da Meta (inevitável,
-  são credenciais pessoais de cada conta Instagram) — e isso é guiado pelo
+- Único trabalho manual real é colar as credenciais da Meta em
+  **Configurações** dentro do próprio app (inevitável, são credenciais
+  pessoais de cada conta Instagram) — e isso é guiado pelo
   `docs/04-integracao-meta.md`.
 - `healthcheck` + script de setup dão feedback claro de sucesso/erro sem
   precisar ler logs de container.
