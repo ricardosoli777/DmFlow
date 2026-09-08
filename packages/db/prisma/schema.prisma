@@ -1,0 +1,93 @@
+// Schema do DMFlow — ver docs/02-arquitetura.md e PROJECT-SPEC.md
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  @@map("users")
+}
+
+model Contact {
+  id         String     @id @default(uuid())
+  igsid      String     @unique
+  name       String?
+  avatarUrl  String?
+  tags       String[]   @default([])
+  attributes Json       @default("{}")
+  createdAt  DateTime   @default(now())
+  flowRuns   FlowRun[]
+  messages   Message[]
+
+  @@map("contacts")
+}
+
+model Flow {
+  id         String       @id @default(uuid())
+  name       String
+  definition Json
+  version    Int          @default(1)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  triggers   PostTrigger[]
+  runs       FlowRun[]
+
+  @@map("flows")
+}
+
+model PostTrigger {
+  id        String   @id @default(uuid())
+  postId    String
+  keyword   String?
+  active    Boolean  @default(true)
+  flowId    String
+  flow      Flow     @relation(fields: [flowId], references: [id])
+  hitCount  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@map("posts_triggers")
+}
+
+model FlowRun {
+  id         String   @id @default(uuid())
+  contactId  String
+  contact    Contact  @relation(fields: [contactId], references: [id])
+  flowId     String
+  flow       Flow     @relation(fields: [flowId], references: [id])
+  currentNode String
+  status     String   @default("running") // running | waiting | done | error
+  context    Json     @default("{}")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("flow_runs")
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  contactId String
+  contact   Contact  @relation(fields: [contactId], references: [id])
+  direction String   // inbound | outbound
+  content   String
+  createdAt DateTime @default(now())
+
+  @@map("messages_log")
+}
+
+model RawEvent {
+  id        String   @id @default(uuid())
+  payload   Json
+  processed Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("events_raw")
+}

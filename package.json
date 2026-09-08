@@ -1,0 +1,27 @@
+{
+  "name": "dmflow",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Automação de DM do Instagram estilo ManyChat — https://github.com/ricardosoli777/DmFlow",
+  "workspaces": [
+    "packages/db",
+    "backend",
+    "worker",
+    "frontend"
+  ],
+  "scripts": {
+    "db:generate": "npm run generate --workspace=@dmflow/db",
+    "db:migrate": "npm run migrate:dev --workspace=@dmflow/db",
+    "db:migrate:deploy": "npm run migrate:deploy --workspace=@dmflow/db",
+    "seed": "npm run seed --workspace=@dmflow/backend",
+    "dev:backend": "npm run dev --workspace=@dmflow/backend",
+    "dev:worker": "npm run dev --workspace=@dmflow/worker",
+    "dev:frontend": "npm run dev --workspace=@dmflow/frontend",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

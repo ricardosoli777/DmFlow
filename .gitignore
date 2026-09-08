@@ -1,0 +1,30 @@
+# dependências
+node_modules/
+.pnpm-store/
+
+# build
+dist/
+build/
+.next/
+out/
+
+# env / segredos
+.env
+.env.*
+!.env.example
+
+# logs
+*.log
+npm-debug.log*
+
+# editor/os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# docker
+*.pid
+
+# testes
+coverage/
