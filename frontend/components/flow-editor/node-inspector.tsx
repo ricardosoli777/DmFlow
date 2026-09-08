@@ -6,10 +6,13 @@ import { Button } from "@/components/ui/button";
 
 type ButtonOption = { label: string; next: string };
 
+const selectClass =
+  "rounded-[var(--radius)] border border-border bg-background p-2 text-sm outline-none focus:ring-2 focus:ring-primary";
+
 // Painel de propriedades — abre quando um node é selecionado no canvas.
 // Cada tipo de node tem seus próprios campos.
 export function NodeInspector() {
-  const { nodes, selectedNodeId, updateNodeData } = useFlowEditorStore();
+  const { nodes, selectedNodeId, updateNodeData, deleteNode, selectNode } = useFlowEditorStore();
   const node = nodes.find((n) => n.id === selectedNodeId);
 
   if (!node) {
@@ -158,6 +161,99 @@ export function NodeInspector() {
           />
         </label>
       )}
+
+      {type === "delay" && (
+        <label className="flex flex-col gap-1 text-sm">
+          Esperar
+          <div className="flex gap-2">
+            <input
+              type="number"
+              min={1}
+              className="w-20 rounded-[var(--radius)] border border-border bg-background p-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+              value={(node.data.duration as number) ?? 1}
+              onChange={(e) => updateNodeData(node.id, { duration: Number(e.target.value) })}
+            />
+            <select
+              className={`flex-1 ${selectClass}`}
+              value={(node.data.unit as string) ?? "minutes"}
+              onChange={(e) => updateNodeData(node.id, { unit: e.target.value })}
+            >
+              <option value="seconds">segundos</option>
+              <option value="minutes">minutos</option>
+              <option value="hours">horas</option>
+            </select>
+          </div>
+          <span className="text-xs text-muted-foreground">
+            Agendamento real (BullMQ) ainda não implementado — por enquanto o fluxo segue direto pro
+            próximo node sem pausar de verdade. Ver docs/07 (Wave 3).
+          </span>
+        </label>
+      )}
+
+      {type === "condition" && (
+        <div className="flex flex-col gap-3 text-sm">
+          <label className="flex flex-col gap-1">
+            Campo do contato a checar
+            <input
+              className="rounded-[var(--radius)] border border-border bg-background p-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+              placeholder="ex: email (campo salvo num node Capturar)"
+              value={(node.data.field as string) ?? ""}
+              onChange={(e) => updateNodeData(node.id, { field: e.target.value })}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            É igual a
+            <input
+              className="rounded-[var(--radius)] border border-border bg-background p-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+              placeholder="valor de comparação"
+              value={(node.data.equals as string) ?? ""}
+              onChange={(e) => updateNodeData(node.id, { equals: e.target.value })}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            Se verdadeiro, vai para
+            <select
+              className={selectClass}
+              value={(node.data.thenNext as string) ?? ""}
+              onChange={(e) => updateNodeData(node.id, { thenNext: e.target.value })}
+            >
+              <option value="">Escolha um node...</option>
+              {otherNodes.map((n) => (
+                <option key={n.id} value={n.id}>
+                  {(n.data.label as string) ?? n.id}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            Se falso, vai para
+            <select
+              className={selectClass}
+              value={(node.data.elseNext as string) ?? ""}
+              onChange={(e) => updateNodeData(node.id, { elseNext: e.target.value })}
+            >
+              <option value="">Escolha um node...</option>
+              {otherNodes.map((n) => (
+                <option key={n.id} value={n.id}>
+                  {(n.data.label as string) ?? n.id}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+
+      <hr className="mt-auto border-border" />
+      <button
+        type="button"
+        onClick={() => {
+          deleteNode(node.id);
+          selectNode(null);
+        }}
+        className="flex items-center justify-center gap-2 rounded-[var(--radius)] border border-danger/30 py-2 text-sm text-danger hover:bg-danger/10"
+      >
+        <Trash2 size={14} /> Excluir este node
+      </button>
     </div>
   );
 }

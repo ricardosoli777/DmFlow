@@ -29,6 +29,7 @@ type FlowEditorState = {
   addNode: (type: FlowNodeType, position: { x: number; y: number }) => void;
   selectNode: (id: string | null) => void;
   updateNodeData: (id: string, data: Record<string, unknown>) => void;
+  deleteNode: (id: string) => void;
 };
 
 let idCounter = 0;
@@ -62,6 +63,14 @@ export const useFlowEditorStore = create<FlowEditorState>((set, get) => ({
   updateNodeData: (id, data) => {
     set({
       nodes: get().nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...data } } : n)),
+    });
+  },
+
+  deleteNode: (id) => {
+    set({
+      nodes: get().nodes.filter((n) => n.id !== id),
+      edges: get().edges.filter((e) => e.source !== id && e.target !== id),
+      selectedNodeId: get().selectedNodeId === id ? null : get().selectedNodeId,
     });
   },
 }));

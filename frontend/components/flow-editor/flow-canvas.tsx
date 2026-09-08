@@ -49,6 +49,7 @@ export function FlowCanvas() {
         }}
         onNodeClick={(_, node) => selectNode(node.id)}
         onPaneClick={() => selectNode(null)}
+        deleteKeyCode={["Backspace", "Delete"]}
         fitView
       >
         <Background gap={16} />

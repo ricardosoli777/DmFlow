@@ -38,6 +38,10 @@ type NodeData = {
   url?: string;
   tag?: string;
   options?: ButtonOption[];
+  duration?: number;
+  unit?: "seconds" | "minutes" | "hours";
+  field?: string;
+  equals?: string;
 };
 
 // Node visual do canvas — RF10. Mostra o conteúdo real configurado (texto,
@@ -95,6 +99,12 @@ function getPreview(data: NodeData): string | null {
       return data.tag ? `#${data.tag}` : null;
     case "webhook":
       return data.url || null;
+    case "delay": {
+      const unitLabel = { seconds: "s", minutes: "min", hours: "h" }[data.unit ?? "minutes"];
+      return data.duration ? `${data.duration}${unitLabel}` : null;
+    }
+    case "condition":
+      return data.field ? `se ${data.field} = ${data.equals || "?"}` : null;
     default:
       return null;
   }
