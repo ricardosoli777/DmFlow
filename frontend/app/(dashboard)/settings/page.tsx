@@ -7,6 +7,35 @@ import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
+
+const HELP = {
+  appId: [
+    "Acesse developers.facebook.com/apps e abra seu app",
+    "Menu lateral → Configurações do app → Básico",
+    "O 'ID do aplicativo' aparece bem no topo da página",
+  ],
+  appSecret: [
+    "Mesma página do App ID (Configurações do app → Básico)",
+    "Logo abaixo, campo 'Chave secreta do aplicativo'",
+    "Clique em 'Mostrar' (pede sua senha do Facebook de novo)",
+  ],
+  igUserId: [
+    "Acesse business.facebook.com → Configurações do negócio",
+    "Menu lateral → Contas → Contas do Instagram",
+    "Clique na sua conta — o ID aparece nos detalhes dela",
+  ],
+  verifyToken: [
+    "Não vem da Meta — você mesmo inventa (ex: uma senha aleatória)",
+    "Use o mesmo valor aqui e ao configurar o Webhook no app",
+    "Lá: produto Instagram → Webhooks → Editar assinatura → 'Verificar token'",
+  ],
+  pageAccessToken: [
+    "Dentro do app → produto Instagram → 'API setup with Instagram business login'",
+    "Na etapa 'Gerar tokens de acesso', ache a linha da sua conta",
+    "Clique em 'Gerar token' e copie o valor completo",
+  ],
+};
 
 type InstagramStatus = {
   connected: boolean;
@@ -118,12 +147,14 @@ export default function SettingsPage() {
           <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field
               label="App ID"
+              help={HELP.appId}
               value={form.appId}
               placeholder={status?.appId || "2799929817056395"}
               onChange={(v) => setForm({ ...form, appId: v })}
             />
             <Field
               label="App Secret"
+              help={HELP.appSecret}
               value={form.appSecret}
               placeholder={status?.hasAppSecret ? "•••••••••• (já configurado)" : ""}
               onChange={(v) => setForm({ ...form, appSecret: v })}
@@ -131,12 +162,14 @@ export default function SettingsPage() {
             />
             <Field
               label="IG User ID"
+              help={HELP.igUserId}
               value={form.igUserId}
               placeholder={status?.igUserId || "28082152674809917"}
               onChange={(v) => setForm({ ...form, igUserId: v })}
             />
             <Field
               label="Verify Token"
+              help={HELP.verifyToken}
               value={form.verifyToken}
               placeholder={status?.hasVerifyToken ? "•••••••••• (já configurado)" : ""}
               onChange={(v) => setForm({ ...form, verifyToken: v })}
@@ -144,6 +177,7 @@ export default function SettingsPage() {
             <div className="sm:col-span-2">
               <Field
                 label="Page Access Token"
+                help={HELP.pageAccessToken}
                 value={form.pageAccessToken}
                 placeholder={status?.hasPageAccessToken ? "•••••••••• (já configurado)" : ""}
                 onChange={(v) => setForm({ ...form, pageAccessToken: v })}
@@ -167,12 +201,14 @@ export default function SettingsPage() {
 
 function Field({
   label,
+  help,
   value,
   placeholder,
   onChange,
   type = "text",
 }: {
   label: string;
+  help?: string[];
   value: string;
   placeholder?: string;
   onChange: (value: string) => void;
@@ -180,7 +216,10 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-1 text-sm">
-      {label}
+      <span className="flex items-center gap-1.5">
+        {label}
+        {help && <InfoTooltip steps={help} />}
+      </span>
       <input
         type={type}
         className="rounded-[var(--radius)] border border-border bg-background p-2 text-sm outline-none focus:ring-2 focus:ring-primary"
