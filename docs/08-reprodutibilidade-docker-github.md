@@ -1,0 +1,95 @@
+# 08 — Reprodutibilidade via GitHub + Docker
+
+Objetivo: qualquer pessoa, **sem conhecimento técnico**, clona
+https://github.com/ricardosoli777/DmFlow e sobe o app funcionando com poucos
+comandos, usando a imagem publicada no GitHub.
+
+## Peças necessárias
+
+### 1. Dockerfiles multi-stage (`backend/Dockerfile`, `frontend/Dockerfile`, `worker/Dockerfile`)
+- Stage `build`: instala deps, compila (TypeScript → JS, Next.js build).
+- Stage `runtime`: imagem enxuta (`node:20-alpine`), só o build final + deps
+  de produção.
+- Usuário non-root, `HEALTHCHECK` definido em cada imagem.
+
+### 2. `docker-compose.yml` na raiz do repo
+Serviços:
+- `postgres` (com volume persistente)
+- `redis`
+- `minio` (com volume persistente)
+- `backend` (API)
+- `worker` (flow engine)
+- `frontend` (dashboard)
+- Rede interna única; só `frontend`/`backend` expõem porta pro host.
+
+Cada serviço com `healthcheck` — isso é o que permite ao `docker compose up`
+reportar claramente "subiu tudo certo" pra quem não entende de infra.
+
+### 3. `.env.example`
+Todas as variáveis necessárias, comentadas em português simples:
+
+```env
+# Credenciais do app Meta (developers.facebook.com)
+META_APP_ID=
+META_APP_SECRET=
+META_PAGE_ACCESS_TOKEN=
+META_VERIFY_TOKEN=
+
+# Banco de dados (gerado automaticamente, não precisa mudar)
+POSTGRES_USER=dmflow
+POSTGRES_PASSWORD=troque_esta_senha
+POSTGRES_DB=dmflow
+
+# Painel (login inicial)
+DASHBOARD_ADMIN_EMAIL=voce@exemplo.com
+DASHBOARD_ADMIN_PASSWORD=troque_esta_senha
+```
+
+### 4. Script de setup guiado
+`setup.sh` (Linux/Mac) e `setup.ps1` (Windows):
+- Verifica se Docker está instalado (senão, mostra link de instalação).
+- Copia `.env.example` → `.env` se não existir.
+- Roda `docker compose pull` (usa imagem já publicada, não precisa buildar
+  local) + `docker compose up -d`.
+- No final, imprime: "Acesse http://localhost:3000 — login: (o que está no .env)".
+
+### 5. GitHub Actions — build e publish da imagem
+`.github/workflows/release.yml`:
+- Dispara em tag `v*.*.*` (ou em cada push na `main`, com tag `:latest`).
+- Builda as 3 imagens (backend, worker, frontend).
+- Publica em `ghcr.io/ricardosoli777/dmflow-backend`,
+  `ghcr.io/ricardosoli777/dmflow-worker`,
+  `ghcr.io/ricardosoli777/dmflow-frontend`.
+- `docker-compose.yml` de produção referencia essas imagens prontas (`image:
+  ghcr.io/...`), então quem clona **não precisa buildar nada** — só puxar.
+
+### 6. README com Quickstart (o que a pessoa leiga vai ler)
+
+```markdown
+## Como rodar
+
+1. Instale o Docker Desktop: https://www.docker.com/products/docker-desktop
+2. Baixe este repositório (botão verde "Code" → "Download ZIP", ou `git clone`)
+3. Abra a pasta e rode:
+   - Windows: clique duas vezes em `setup.ps1` (ou rode no PowerShell)
+   - Mac/Linux: `./setup.sh`
+4. Preencha o arquivo `.env` com suas credenciais do Meta (veja o guia em `docs/04-integracao-meta.md`)
+5. Rode o script de novo (ele detecta o `.env` preenchido e sobe tudo)
+6. Acesse http://localhost:3000
+```
+
+### 7. Release versionada
+- `CHANGELOG.md` simples por versão.
+- Toda wave concluída com Verify passando vira uma tag (`v0.1.0`, `v0.2.0`...)
+  — assim sempre existe uma imagem "conhecida boa" pra quem for clonar, em
+  vez de depender do estado atual da `main`.
+
+## Por que isso cumpre o objetivo de "outras pessoas sem conhecimento"
+
+- Ninguém precisa instalar Node, Postgres, Redis — só Docker.
+- Ninguém precisa buildar nada — a imagem já vem pronta do GHCR.
+- Único trabalho manual real é preencher credenciais da Meta (inevitável,
+  são credenciais pessoais de cada conta Instagram) — e isso é guiado pelo
+  `docs/04-integracao-meta.md`.
+- `healthcheck` + script de setup dão feedback claro de sucesso/erro sem
+  precisar ler logs de container.
