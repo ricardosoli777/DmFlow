@@ -19,7 +19,10 @@ export function SidebarNav() {
 
   return (
     <aside className="flex h-screen w-60 flex-col border-r border-border bg-card p-4">
-      <div className="mb-8 px-2 text-lg font-bold">DMFlow</div>
+      <div className="mb-8 flex items-center gap-2 px-2">
+        <img src="/logo.svg" alt="" width={28} height={28} className="rounded-md" />
+        <span className="text-lg font-bold">DMFlow</span>
+      </div>
       <nav className="flex flex-col gap-1">
         {items.map((item) => {
           const active = pathname === item.href;

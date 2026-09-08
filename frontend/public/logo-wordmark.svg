@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 96">
+  <rect x="0" y="0" width="96" height="96" rx="22" fill="#8B5CF6"/>
+  <path d="M29 50 L70 26 L54 70 L45 53 Z" fill="#ffffff"/>
+  <path d="M45 53 L70 26" stroke="#8B5CF6" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="116" y="63" font-family="Inter, system-ui, sans-serif" font-size="42" font-weight="700" fill="#111827">DMFlow</text>
+</svg>

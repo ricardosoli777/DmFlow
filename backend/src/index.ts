@@ -5,6 +5,7 @@ import { env } from "./env";
 import { authRoutes } from "./routes/auth";
 import { contactRoutes } from "./routes/contacts";
 import { flowRoutes } from "./routes/flows";
+import { instagramMediaRoutes } from "./routes/instagram-media";
 import { messageRoutes } from "./routes/messages";
 import { metricsRoutes } from "./routes/metrics";
 import { settingsRoutes } from "./routes/settings";
@@ -37,6 +38,7 @@ async function bootstrap() {
   await app.register(messageRoutes);
   await app.register(metricsRoutes);
   await app.register(settingsRoutes);
+  await app.register(instagramMediaRoutes);
 
   await app.listen({ port: env.PORT, host: "0.0.0.0" });
 }

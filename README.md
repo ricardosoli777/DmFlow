@@ -1,4 +1,6 @@
-# DMFlow
+<p align="center">
+  <img src="frontend/public/logo-wordmark.svg" alt="DMFlow" width="280" />
+</p>
 
 Automação de DM do Instagram estilo ManyChat — para uso próprio, com painel
 visual de arrastar-e-soltar pra montar os fluxos de conversa.
@@ -160,10 +162,23 @@ DMFlow/
 
 - ✅ Wave 0 — fundação do monorepo
 - ✅ Wave 1 — backend/worker/frontend base (webhook, banco, fila, dashboard)
-- 🟡 Wave 2 — integração real com a Meta: código pronto, credenciais
-  configuradas (app "klead - IG"); falta só apontar o webhook pra URL de
-  produção e testar ponta a ponta
-- ⏳ Wave 3 (refinar flow engine) / Wave 4 (completar dashboard) em aberto
+- ✅ **Wave 2 — Meta conectada e webhook validado em produção:** app
+  "klead - IG" configurado, conta `@oricasoares` conectada e verificada via
+  Graph API (visível em `/settings`), webhook confirmado pela Meta (handshake
+  `hub.challenge` respondido com sucesso). Falta só testar um comentário real
+  ponta a ponta.
+- 🟡 Wave 3/4 (flow engine + dashboard) — bastante avançado:
+  - Editor de fluxo com drag-and-drop (React Flow), 11 tipos de node
+    (mensagem, botões com CTA, imagem, áudio, vídeo, aguardar, condição,
+    capturar, tag, webhook, fim)
+  - Nodes mostram o conteúdo configurado direto no card; exclusão via
+    tecla Delete ou ícone no próprio node
+  - `/settings` — conexão Instagram gerenciável pelo dashboard (com
+    passo a passo em cada campo), não só via `.env`
+  - `/triggers` — formulário real de criação (post + palavra-chave + fluxo)
+  - Pendente: agendamento real do node "Aguardar" (fila com atraso), upload
+    de mídia por arrastar-e-soltar (hoje é só URL), edição de texto inline
+    no canvas
 - ✅ **Wave 6 — no ar em produção:** https://dmflow.arkitekt.space
   (dashboard) e https://hooks.arkitekt.space (API/webhook), rodando via
   Docker Swarm na VPS arkitekt.space
