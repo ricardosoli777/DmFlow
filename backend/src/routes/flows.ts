@@ -63,4 +63,23 @@ export async function flowRoutes(app: FastifyInstance) {
       },
     });
   });
+
+  app.delete("/flows/:id", async (req, reply) => {
+    const { id } = req.params as { id: string };
+
+    const triggerCount = await prisma.postTrigger.count({ where: { flowId: id } });
+    if (triggerCount > 0) {
+      return reply.status(409).send({
+        error: `Este fluxo está em uso por ${triggerCount} automação(ões) — exclua ou reatribua os triggers em "Triggers" antes de excluir o fluxo.`,
+      });
+    }
+
+    // histórico de execuções desse fluxo não faz sentido sem o fluxo — some junto
+    await prisma.$transaction([
+      prisma.flowRun.deleteMany({ where: { flowId: id } }),
+      prisma.flow.delete({ where: { id } }),
+    ]);
+
+    return reply.status(204).send();
+  });
 }

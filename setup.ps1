@@ -9,8 +9,10 @@ if (-not (Test-Path ".env")) {
     Copy-Item ".env.example" ".env"
     Write-Host ""
     Write-Host "Criei o arquivo .env a partir do .env.example."
-    Write-Host "Abra o .env, preencha suas credenciais (principalmente as do Meta,"
-    Write-Host "veja docs/04-integracao-meta.md) e rode este script de novo."
+    Write-Host "Abra o .env e troque o e-mail/senha do dashboard (DASHBOARD_ADMIN_EMAIL/"
+    Write-Host "DASHBOARD_ADMIN_PASSWORD) e as senhas genericas de banco/fila. Nao precisa"
+    Write-Host "preencher nada da Meta aqui -- isso e feito depois, dentro do app, em"
+    Write-Host "Configuracoes (veja docs/04-integracao-meta.md). Depois rode este script de novo."
     exit 0
 }
 

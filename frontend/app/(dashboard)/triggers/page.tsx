@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw } from "lucide-react";
+import { Pause, Play, RefreshCw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +41,44 @@ export default function TriggersPage() {
     queryKey: ["triggers"],
     queryFn: () => api.get<Trigger[]>("/triggers"),
   });
+
+  const [editingKeywordId, setEditingKeywordId] = useState<string | null>(null);
+  const [keywordDraft, setKeywordDraft] = useState("");
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const updateTrigger = useMutation({
+    mutationFn: ({ id, ...patch }: { id: string; active?: boolean; keyword?: string | null }) =>
+      api.patch(`/triggers/${id}`, patch),
+    onSuccess: () => {
+      setActionError(null);
+      queryClient.invalidateQueries({ queryKey: ["triggers"] });
+    },
+    onError: (err: unknown) => setActionError(err instanceof Error ? err.message : "Não foi possível atualizar."),
+  });
+
+  const deleteTrigger = useMutation({
+    mutationFn: (id: string) => api.delete(`/triggers/${id}`),
+    onSuccess: () => {
+      setActionError(null);
+      queryClient.invalidateQueries({ queryKey: ["triggers"] });
+    },
+    onError: (err: unknown) => setActionError(err instanceof Error ? err.message : "Não foi possível excluir."),
+  });
+
+  function startEditingKeyword(t: Trigger) {
+    setEditingKeywordId(t.id);
+    setKeywordDraft(t.keyword ?? "");
+  }
+
+  function saveKeyword(id: string) {
+    updateTrigger.mutate({ id, keyword: keywordDraft.trim() || null });
+    setEditingKeywordId(null);
+  }
+
+  function handleDeleteTrigger(t: Trigger) {
+    if (!window.confirm(`Excluir esta automação (post ${t.postId})? Essa ação não pode ser desfeita.`)) return;
+    deleteTrigger.mutate(t.id);
+  }
 
   const { data: flows } = useQuery({
     queryKey: ["flows"],
@@ -200,6 +238,8 @@ export default function TriggersPage() {
         </Card>
       )}
 
+      {actionError && <p className="text-sm text-danger">{actionError}</p>}
+
       <Card className="overflow-hidden">
         <table className="w-full text-sm">
           <thead className="border-b border-border bg-muted/50 text-left text-muted-foreground">
@@ -209,6 +249,7 @@ export default function TriggersPage() {
               <th className="p-4 font-medium">Fluxo</th>
               <th className="p-4 font-medium">Disparos</th>
               <th className="p-4 font-medium">Status</th>
+              <th className="p-4 font-medium">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -217,17 +258,63 @@ export default function TriggersPage() {
                 <td className="max-w-[200px] truncate p-4 font-mono text-xs" title={t.postId}>
                   {t.postId}
                 </td>
-                <td className="p-4">{t.keyword ?? <span className="text-muted-foreground">qualquer comentário</span>}</td>
+                <td className="p-4">
+                  {editingKeywordId === t.id ? (
+                    <input
+                      autoFocus
+                      className="w-32 rounded-[var(--radius)] border border-border bg-background p-1.5 text-xs outline-none focus:ring-2 focus:ring-primary"
+                      value={keywordDraft}
+                      placeholder="qualquer comentário"
+                      onChange={(e) => setKeywordDraft(e.target.value)}
+                      onBlur={() => saveKeyword(t.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveKeyword(t.id);
+                        if (e.key === "Escape") setEditingKeywordId(null);
+                      }}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => startEditingKeyword(t)}
+                      className="rounded px-1.5 py-0.5 text-left hover:bg-muted"
+                      title="Clique pra editar"
+                    >
+                      {t.keyword ?? <span className="text-muted-foreground">qualquer comentário</span>}
+                    </button>
+                  )}
+                </td>
                 <td className="p-4">{t.flow.name}</td>
                 <td className="p-4">{t.hitCount}</td>
                 <td className="p-4">
                   <Badge variant={t.active ? "ativo" : "pausado"}>{t.active ? "Ativo" : "Pausado"}</Badge>
                 </td>
+                <td className="p-4">
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => updateTrigger.mutate({ id: t.id, active: !t.active })}
+                      disabled={updateTrigger.isPending}
+                      className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      title={t.active ? "Pausar automação" : "Reativar automação"}
+                    >
+                      {t.active ? <Pause size={14} /> : <Play size={14} />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteTrigger(t)}
+                      disabled={deleteTrigger.isPending}
+                      className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-danger"
+                      title="Excluir automação"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </td>
               </tr>
             ))}
             {!triggers?.length && (
               <tr>
-                <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                <td colSpan={6} className="p-8 text-center text-muted-foreground">
                   Nenhum trigger criado ainda.
                 </td>
               </tr>

@@ -65,7 +65,7 @@ Pré-requisito: Wave 1 completa + Wave 0.3 (app Meta configurado).
 
 | Etapa | Entrega | Critério de aceite | Status |
 |---|---|---|---|
-| 2A — Envio de DM | Serviço que chama Private Reply + Instagram Messaging API | Comentário real de teste dispara DM real na sua conta | Código pronto e credenciais reais configuradas (app "klead - IG") — falta só apontar o webhook na Meta pra validar com comentário real |
+| 2A — Envio de DM | Serviço que chama Private Reply + Instagram Messaging API | Comentário real de teste dispara DM real na sua conta | Código pronto e credenciais reais configuradas no app da Meta — falta só apontar o webhook na Meta pra validar com comentário real |
 | 2B — Recebimento de resposta | Handler de `messages`/`messaging_postbacks` gravando resposta do usuário | Responder a DM de teste gera registro em `messages_log` em até 1 wave de webhook | Código pronto, pipeline completo verificado (ver abaixo) |
 | 2C — Janela de 24h | Checagem de timestamp antes de enviar mensagem fora do gatilho imediato | Tentativa de envio fora da janela é bloqueada e logada, não falha silenciosamente | ✅ Pronto — `Contact.lastInboundAt` + bloqueio logado como `Message.direction = "blocked"` |
 

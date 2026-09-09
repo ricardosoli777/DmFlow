@@ -23,7 +23,7 @@ export async function triggerRoutes(app: FastifyInstance) {
   app.patch("/triggers/:id", async (req) => {
     const { id } = req.params as { id: string };
     const body = z
-      .object({ active: z.boolean().optional(), keyword: z.string().optional() })
+      .object({ active: z.boolean().optional(), keyword: z.string().nullable().optional() })
       .parse(req.body);
     return prisma.postTrigger.update({ where: { id }, data: body });
   });

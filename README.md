@@ -20,15 +20,33 @@ visualmente no dashboard, sem escrever código.
 
 **Pré-requisito único: [Docker Desktop](https://www.docker.com/products/docker-desktop) instalado.**
 
+> ⚠️ **Rodando só no seu computador (`localhost`), o dashboard funciona,
+> mas a Meta não consegue mandar eventos reais** (comentário, DM) pra
+> `http://localhost:3000` — isso só existe na sua máquina. Pra automação
+> funcionar de verdade com o Instagram, o app precisa estar acessível por
+> uma URL pública com HTTPS: ou você [faz o deploy numa VPS](#️-deploy-em-produção-vps-própria-docker-swarm),
+> ou usa um túnel temporário (ex: `ngrok http 4000`) só pra testar o
+> webhook sem publicar nada ainda.
+
 1. Baixe este repositório: botão verde **Code → Download ZIP** (ou
    `git clone https://github.com/ricardosoli777/DmFlow.git` se souber git).
 2. Abra a pasta baixada.
 3. Rode o script de setup:
-   - **Windows:** clique com o botão direito em `setup.ps1` → "Executar com PowerShell"
+   - **Windows:** clique com o botão direito em `setup.ps1` → "Executar com PowerShell".
+     Se aparecer um erro tipo *"não é possível carregar o arquivo... a
+     execução de scripts foi desabilitada neste sistema"*, abra o
+     PowerShell nessa pasta e rode
+     `powershell -ExecutionPolicy Bypass -File setup.ps1` em vez de clicar
+     duas vezes — é uma proteção padrão do Windows contra scripts
+     baixados da internet, não é erro do DMFlow.
    - **Mac/Linux:** abra o terminal na pasta e rode `./setup.sh`
-4. Na primeira vez, ele vai criar um arquivo `.env` só com a infraestrutura
-   (banco, fila, storage) e o login inicial do dashboard — não precisa mais
-   preencher nenhuma credencial da Meta aqui.
+4. Na primeira vez, ele vai criar um arquivo `.env` e parar, pedindo pra
+   você preencher. Abra o `.env` num editor de texto simples (Bloco de
+   Notas serve) e troque só o e-mail/senha do login do dashboard
+   (`DASHBOARD_ADMIN_EMAIL`/`DASHBOARD_ADMIN_PASSWORD`) e as senhas
+   genéricas de banco/fila (`troque_esta_senha...`) por valores seus —
+   **não precisa preencher nenhuma credencial da Meta aqui**, isso é feito
+   depois, dentro do próprio app.
 5. Rode o script de novo. Ele vai baixar as imagens prontas e subir tudo.
 6. Acesse **http://localhost:3000**, faça login com o e-mail/senha que você
    definiu no `.env` e vá em **Configurações** (`/settings`) pra colar as
@@ -163,11 +181,10 @@ DMFlow/
 
 - ✅ Wave 0 — fundação do monorepo
 - ✅ Wave 1 — backend/worker/frontend base (webhook, banco, fila, dashboard)
-- ✅ **Wave 2 — Meta conectada e webhook validado em produção:** app
-  "klead - IG" configurado, conta `@oricasoares` conectada e verificada via
-  Graph API (visível em `/settings`), webhook confirmado pela Meta (handshake
-  `hub.challenge` respondido com sucesso). Falta só testar um comentário real
-  ponta a ponta.
+- ✅ **Wave 2 — Meta conectada e webhook validado em produção:** app da Meta
+  configurado, conta Instagram conectada e verificada via Graph API (visível
+  em `/settings`), webhook confirmado pela Meta (handshake `hub.challenge`
+  respondido com sucesso). Falta só testar um comentário real ponta a ponta.
 - 🟡 Wave 3/4 (flow engine + dashboard) — bastante avançado:
   - Editor de fluxo com drag-and-drop (React Flow), 11 tipos de node
     (mensagem, botões com CTA, imagem, áudio, vídeo, aguardar, condição,

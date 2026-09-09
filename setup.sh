@@ -11,8 +11,10 @@ if [ ! -f .env ]; then
   cp .env.example .env
   echo ""
   echo "Criei o arquivo .env a partir do .env.example."
-  echo "Abra o .env, preencha suas credenciais (principalmente as do Meta,"
-  echo "veja docs/04-integracao-meta.md) e rode este script de novo."
+  echo "Abra o .env e troque o e-mail/senha do dashboard (DASHBOARD_ADMIN_EMAIL/"
+  echo "DASHBOARD_ADMIN_PASSWORD) e as senhas genéricas de banco/fila. Não precisa"
+  echo "preencher nada da Meta aqui — isso é feito depois, dentro do app, em"
+  echo "Configurações (veja docs/04-integracao-meta.md). Depois rode este script de novo."
   exit 0
 fi
 

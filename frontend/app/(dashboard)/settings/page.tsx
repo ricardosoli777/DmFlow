@@ -149,7 +149,7 @@ export default function SettingsPage() {
               label="App ID"
               help={HELP.appId}
               value={form.appId}
-              placeholder={status?.appId || "2799929817056395"}
+              placeholder={status?.appId || "ex: 1234567890123456"}
               onChange={(v) => setForm({ ...form, appId: v })}
             />
             <Field
@@ -164,7 +164,7 @@ export default function SettingsPage() {
               label="IG User ID"
               help={HELP.igUserId}
               value={form.igUserId}
-              placeholder={status?.igUserId || "28082152674809917"}
+              placeholder={status?.igUserId || "ex: 17841400000000000"}
               onChange={(v) => setForm({ ...form, igUserId: v })}
             />
             <Field
