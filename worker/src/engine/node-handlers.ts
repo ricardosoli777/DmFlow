@@ -1,7 +1,7 @@
 import type { Contact, FlowRun } from "@dmflow/db";
 import { getPrisma } from "@dmflow/db";
 import type { ButtonAction } from "../services/instagram";
-import { sendButtonsMessage, sendDirectMessage, sendMediaMessage } from "../services/instagram";
+import { sendButtonsMessage, sendDirectMessage, sendMediaMessage, sendPrivateReply } from "../services/instagram";
 
 const prisma = getPrisma();
 
@@ -26,7 +26,29 @@ type HandlerArgs = {
   contact: Contact;
   /** Presente quando o node está sendo retomado após esperar resposta do usuário (ex: capture). */
   resumeInput?: string;
+  /**
+   * Presente só no primeiro node de um flow_run disparado por comentário,
+   * e só uma vez. A primeira mensagem de texto puro (sem CTA — Private
+   * Reply não suporta botões/mídia) sai por esse endpoint em vez de DM
+   * comum, porque a Meta pode recusar abrir uma conversa nova via envio
+   * direto. Ver worker/src/engine/executor.ts.
+   */
+  privateReply?: { commentId: string };
 };
+
+// Manda texto puro pela Private Reply (se disponível e sem CTA) ou pela DM normal.
+async function sendText(
+  contact: Contact,
+  text: string,
+  actions: ButtonAction[],
+  privateReply?: { commentId: string },
+): Promise<void> {
+  if (privateReply && actions.length === 0) {
+    await sendPrivateReply(privateReply.commentId, contact.igsid, text);
+    return;
+  }
+  await sendDirectMessage(contact.igsid, text, actions);
+}
 
 // RF05 — um handler por tipo de node, testável isoladamente.
 export const nodeHandlers: Record<FlowNode["type"], (args: HandlerArgs) => Promise<NodeResult>> = {
@@ -34,14 +56,19 @@ export const nodeHandlers: Record<FlowNode["type"], (args: HandlerArgs) => Promi
   // se tiver `options`, a mensagem sai com botões e o fluxo espera o clique
   // (postback) em vez de seguir direto pro `next` — mesmo comportamento do
   // node "Botões" dedicado, só que embutido.
-  message: async ({ node, contact }) => {
+  message: async ({ node, contact, privateReply }) => {
     const actions = toButtonActions(node.options);
-    await sendDirectMessage(contact.igsid, String(node.text ?? ""), actions);
+    await sendText(contact, String(node.text ?? ""), actions, privateReply);
     return hasPostback(actions)
       ? { nextNodeId: null, waitingForInput: true }
       : { nextNodeId: (node.next as string) ?? null, waitingForInput: false };
   },
 
+  // Botões/mídia não passam pela Private Reply (a Meta não aceita anexo nem
+  // template nesse endpoint) — se um destes for o node inicial de um fluxo
+  // disparado por comentário, a primeira mensagem ainda sai como DM comum e
+  // corre o risco de falhar se a conversa nunca foi aberta. Prefira começar
+  // o fluxo com um node "Mensagem" de texto puro quando o trigger for comentário.
   buttons: async ({ node, contact }) => {
     const actions = toButtonActions(node.options);
     await sendButtonsMessage(contact.igsid, String(node.text ?? ""), actions);
@@ -91,9 +118,9 @@ export const nodeHandlers: Record<FlowNode["type"], (args: HandlerArgs) => Promi
     return { nextNodeId: next ?? null, waitingForInput: false };
   },
 
-  capture: async ({ node, contact, resumeInput }) => {
+  capture: async ({ node, contact, resumeInput, privateReply }) => {
     if (resumeInput === undefined) {
-      await sendDirectMessage(contact.igsid, String(node.prompt ?? ""));
+      await sendText(contact, String(node.prompt ?? ""), [], privateReply);
       return { nextNodeId: null, waitingForInput: true };
     }
 

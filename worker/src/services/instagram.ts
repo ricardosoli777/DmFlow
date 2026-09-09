@@ -138,11 +138,15 @@ export async function sendMediaMessage(
 
 /**
  * Abre a thread de DM a partir de um comentário (Private Reply). Sempre
- * permitido pela Meta logo após o comentário — não passa pela checagem de janela.
+ * permitido pela Meta logo após o comentário — não passa pela checagem de
+ * janela (é esse endpoint que abre a janela, não o contrário). Usado só na
+ * primeira mensagem de um flow_run disparado por comentário — ver
+ * `usePrivateReplyForFirstMessage` em worker/src/engine/node-handlers.ts.
  */
-export async function sendPrivateReply(commentId: string, text: string): Promise<void> {
+export async function sendPrivateReply(commentId: string, igsid: string, text: string): Promise<void> {
   const settings = await getMetaSettings();
   await callGraphApi(settings, `/${commentId}/private_replies`, { message: text });
+  await logOutbound(igsid, text);
 }
 
 /**

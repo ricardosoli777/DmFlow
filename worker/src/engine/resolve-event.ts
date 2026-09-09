@@ -54,7 +54,9 @@ export async function resolveEvent(event: InstagramEvent): Promise<void> {
         flowId: flow.id,
         currentNode: definition.start,
         status: "running",
-        context: { originCommentId: event.commentId },
+        // `pendingPrivateReply` faz o primeiro node de texto puro (sem CTA)
+        // sair via Private Reply em vez de DM direta — ver node-handlers.ts.
+        context: { originCommentId: event.commentId, pendingPrivateReply: true },
       },
     });
 
