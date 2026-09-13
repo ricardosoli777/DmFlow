@@ -15,6 +15,7 @@ type Trigger = {
   type: TriggerType;
   postId: string | null;
   keyword: string | null;
+  publicReplyText: string | null;
   active: boolean;
   hitCount: number;
   flow: { name: string };
@@ -47,6 +48,7 @@ export default function TriggersPage() {
   const [type, setType] = useState<TriggerType>("comment");
   const [postId, setPostId] = useState("");
   const [keyword, setKeyword] = useState("");
+  const [publicReplyText, setPublicReplyText] = useState("");
   const [flowId, setFlowId] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -62,7 +64,16 @@ export default function TriggersPage() {
   const [testResult, setTestResult] = useState<{ id: string; message: string } | null>(null);
 
   const updateTrigger = useMutation({
-    mutationFn: ({ id, ...patch }: { id: string; active?: boolean; keyword?: string | null; flowId?: string }) =>
+    mutationFn: ({
+      id,
+      ...patch
+    }: {
+      id: string;
+      active?: boolean;
+      keyword?: string | null;
+      publicReplyText?: string | null;
+      flowId?: string;
+    }) =>
       api.patch(`/triggers/${id}`, patch),
     onSuccess: () => {
       setActionError(null);
@@ -134,12 +145,14 @@ export default function TriggersPage() {
         type,
         postId: type === "comment" ? postId : undefined,
         keyword: keyword.trim() || undefined,
+        publicReplyText: type === "comment" ? publicReplyText.trim() || undefined : undefined,
         flowId,
       }),
     onSuccess: () => {
       setShowForm(false);
       setPostId("");
       setKeyword("");
+      setPublicReplyText("");
       setFlowId("");
       setError(null);
       queryClient.invalidateQueries({ queryKey: ["triggers"] });
@@ -275,6 +288,22 @@ export default function TriggersPage() {
               />
             </label>
 
+            {type === "comment" && (
+              <label className="flex flex-col gap-1 text-sm">
+                Resposta pública no comentário (opcional — some antes da DM, tipo prova social)
+                <input
+                  className="rounded-[var(--radius)] border border-border bg-background p-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="ex: {{name}}, te chamei no DM! 📩"
+                  value={publicReplyText}
+                  onChange={(e) => setPublicReplyText(e.target.value)}
+                />
+                <span className="text-xs text-muted-foreground">
+                  Use <code>{"{{name}}"}</code> ou <code>{"{{username}}"}</code> pra personalizar — também funciona
+                  no texto de qualquer node do fluxo.
+                </span>
+              </label>
+            )}
+
             <label className="flex flex-col gap-1 text-sm">
               Fluxo a disparar
               <select
@@ -336,6 +365,7 @@ export default function TriggersPage() {
                 onCancelEditKeyword={() => setEditingKeywordId(null)}
                 onToggleActive={() => updateTrigger.mutate({ id: t.id, active: !t.active })}
                 onChangeFlow={(newFlowId) => updateTrigger.mutate({ id: t.id, flowId: newFlowId })}
+                onChangePublicReply={(text) => updateTrigger.mutate({ id: t.id, publicReplyText: text || null })}
                 onDelete={() => handleDeleteTrigger(t)}
                 onTest={() => {
                   setTestResult(null);
@@ -374,6 +404,7 @@ function TriggerRow(props: {
   onCancelEditKeyword: () => void;
   onToggleActive: () => void;
   onChangeFlow: (flowId: string) => void;
+  onChangePublicReply: (text: string) => void;
   onDelete: () => void;
   onTest: () => void;
   testing: boolean;
@@ -500,6 +531,21 @@ function TriggerRow(props: {
       {expanded && (
         <tr className="border-b border-border bg-muted/20 last:border-0">
           <td colSpan={7} className="p-4">
+            {t.type === "comment" && (
+              <div className="mb-4 flex flex-col gap-1">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Resposta pública no comentário (opcional)
+                </label>
+                <input
+                  className="w-full max-w-md rounded-[var(--radius)] border border-border bg-background p-1.5 text-xs outline-none focus:ring-2 focus:ring-primary"
+                  defaultValue={t.publicReplyText ?? ""}
+                  placeholder="sem resposta pública configurada"
+                  onBlur={(e) => {
+                    if (e.target.value !== (t.publicReplyText ?? "")) props.onChangePublicReply(e.target.value);
+                  }}
+                />
+              </div>
+            )}
             <p className="mb-2 text-xs font-medium text-muted-foreground">Últimos disparos deste trigger</p>
             {!detail && <p className="text-xs text-muted-foreground">Carregando...</p>}
             {detail && detail.flowRuns.length === 0 && (

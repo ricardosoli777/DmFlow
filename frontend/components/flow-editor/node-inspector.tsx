@@ -64,6 +64,9 @@ export function NodeInspector() {
             value={(node.data.text as string) ?? ""}
             onChange={(e) => updateNodeData(node.id, { text: e.target.value })}
           />
+          <span className="text-xs text-muted-foreground">
+            Use <code>{"{{name}}"}</code> ou <code>{"{{username}}"}</code> pra personalizar com o nome do contato.
+          </span>
         </label>
       )}
 
