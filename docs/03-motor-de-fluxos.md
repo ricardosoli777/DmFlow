@@ -25,18 +25,46 @@ JSON. Cada contato tem um `flow_run` que aponta pro node atual + um contexto
 }
 ```
 
-## Tipos de node (v1)
+## O que dispara um fluxo (trigger)
+
+Um **trigger** é o evento que faz o `worker` criar um `flow_run` novo pra um
+contato. Hoje só existe um tipo implementado; os outros são só automação de
+Instagram conhecida no mercado, ainda não construída aqui — servem de lista
+pra decidir o que vale a pena adicionar depois.
+
+### Implementado
+
+| Trigger | Como funciona | Onde configurar |
+|---|---|---|
+| **Comentário em post/reel** | Alguém comenta num post específico (com palavra-chave opcional) → dispara o fluxo escolhido. Webhook `comments` da Meta. | `/triggers` no dashboard |
+
+### Não implementado (candidatos pra adicionar)
+
+| Trigger | O que seria | Webhook/API envolvido | Complexidade |
+|---|---|---|---|
+| **DM com palavra-chave** | Alguém manda uma mensagem direta pra conta (sem ter comentado nada) contendo uma palavra específica → dispara um fluxo | Webhook `messages` (já chega no backend, hoje só reage a `flow_run` existente — precisaria checar se não há run ativo e casar a palavra-chave antes de ignorar) | Baixa — reaproveita quase tudo que já existe |
+| **Resposta a Story** | Usuário responde (reply) a um story publicado pela conta → dispara um fluxo | Webhook `messages` com campo `reply_to.story` preenchido | Baixa/média — é uma variação do trigger de DM, só muda a detecção |
+| **Menção em post/story de terceiros** | Alguém marca a conta em post ou story próprio → dispara um fluxo (ex: agradecimento automático) | Webhook `mentions` (permissão `instagram_manage_mentions`) | Média — precisa de permissão nova no app da Meta e um endpoint de webhook novo |
+| **Clique em anúncio (Click-to-Instagram/CTWA)** | Alguém clica num anúncio configurado pra abrir DM → a primeira mensagem chega com um `referral` de campanha → dispara um fluxo específico daquele anúncio | Webhook `messages`, campo `referral` | Média — precisa mapear `ref`/`ad_id` pra um fluxo, parecido com o trigger de post mas pra anúncios |
+| **Novo seguidor** | Alguém começa a seguir a conta → dispara uma DM de boas-vindas | Não existe webhook direto da Meta pra isso hoje (a Instagram Graph API não notifica novos seguidores em tempo real) | Alta — provavelmente exigiria polling periódico, não é um caso bem suportado pela API |
+
+## Tipos de node dentro de um fluxo
 
 | Tipo | Função |
 |---|---|
-| `message` | Envia texto (ou mídia via MinIO) |
-| `buttons` | Envia quick replies / botões; próximo node depende da escolha |
-| `delay` | Espera N segundos/minutos antes do próximo node |
-| `condition` | Ramifica com base em atributo/tag do contato |
+| `message` | Texto livre; aceita CTA opcional (botão que vai pra outro node, ou abre link externo) |
+| `buttons` | Igual `message`, mas sempre pensado pra ter opções — mesmo motor de CTA por baixo |
+| `image` / `audio` / `video` | Envia mídia por URL pública; aceita o mesmo CTA opcional de `message` |
+| `delay` | Espera N segundos/minutos antes do próximo node (agendamento real ainda não implementado — ver pendências) |
+| `condition` | Ramifica com base num atributo/tag salvo do contato (`thenNext`/`elseNext`) |
 | `capture` | Espera resposta livre do usuário e salva num campo do contato |
-| `tag` | Adiciona/remove tag do contato |
+| `tag` | Adiciona uma tag ao contato |
 | `webhook` | Chama uma URL externa (ex: CRM, planilha, automação) |
-| `end` | Encerra o flow_run |
+| `end` | Encerra o `flow_run` |
+
+Cada botão de CTA (em `message`, `buttons`, `image`, `audio`, `video`) é ou
+`next` (vai pra outro node do fluxo via postback) ou `url` (abre um link
+externo) — nunca os dois ao mesmo tempo. Ver `worker/src/engine/node-handlers.ts`.
 
 ## Execução
 

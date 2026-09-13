@@ -65,7 +65,7 @@ Pré-requisito: Wave 1 completa + Wave 0.3 (app Meta configurado).
 
 | Etapa | Entrega | Critério de aceite | Status |
 |---|---|---|---|
-| 2A — Envio de DM | Serviço que chama Private Reply + Instagram Messaging API | Comentário real de teste dispara DM real na sua conta | Código pronto e credenciais reais configuradas no app da Meta — falta só apontar o webhook na Meta pra validar com comentário real |
+| 2A — Envio de DM | Serviço que chama Private Reply + Instagram Messaging API | Comentário real de teste dispara DM real na sua conta | ✅ Confirmado em produção — webhook apontado, worker processando eventos reais (ver 6C) |
 | 2B — Recebimento de resposta | Handler de `messages`/`messaging_postbacks` gravando resposta do usuário | Responder a DM de teste gera registro em `messages_log` em até 1 wave de webhook | Código pronto, pipeline completo verificado (ver abaixo) |
 | 2C — Janela de 24h | Checagem de timestamp antes de enviar mensagem fora do gatilho imediato | Tentativa de envio fora da janela é bloqueada e logada, não falha silenciosamente | ✅ Pronto — `Contact.lastInboundAt` + bloqueio logado como `Message.direction = "blocked"` |
 
@@ -79,10 +79,10 @@ Pré-requisito: Wave 1 completa + Wave 0.3 (app Meta configurado).
   consumiu → criou o contato no banco → marcou o evento como processado.
   Nenhum DM foi enviado porque não havia trigger cadastrado pro post de
   teste (comportamento correto, RF02).
-- ⏳ **Falta só:** configurar a URL do webhook no painel da Meta
-  (`https://hooks.example.com/webhooks/instagram` + o verify token) e
-  testar com um comentário real, numa conta/post de verdade — só isso
-  depende de uma ação manual sua no painel da Meta, não de código.
+- ✅ **Confirmado (2026-09-13):** webhook configurado no painel da Meta
+  apontando pra `https://hooks.arkitekt.space/webhooks/instagram`, tráfego
+  real chegando em produção e worker processando eventos reais da fila
+  `instagram-events` (ver detalhes na 6C, Wave 6).
 
 ---
 
@@ -141,7 +141,7 @@ pra produção).
 |---|---|---|---|
 | 6A — Stack Swarm | `docker stack deploy -c infra/docker-stack.yml dmflow` usando as imagens do GHCR | Serviço `dmflow_*` aparece `Running` no `docker service ls` | ✅ Feito — todos os 7 serviços `1/1` (migrate `0/1` é esperado, roda uma vez e conclui) |
 | 6B — Traefik + domínio | `dmflow.example.com` (dashboard) + `hooks.example.com` (API/webhook) com HTTPS | Sites acessíveis via HTTPS, certificado válido | ✅ Confirmado: `dmflow.example.com` → HTTP 200, `hooks.example.com/health` → HTTP 200 |
-| 6C — Webhook produção | Webhook da Meta reapontado pra URL de produção | Evento real de comentário processado em produção, ponta a ponta | Pendente — falta configurar o webhook no painel da Meta apontando pra `https://hooks.example.com/webhooks/instagram` |
+| 6C — Webhook produção | Webhook da Meta reapontado pra URL de produção | Evento real de comentário processado em produção, ponta a ponta | ✅ Confirmado (2026-09-13) — webhook apontado pra `https://hooks.arkitekt.space/webhooks/instagram`, tráfego real chegando (`GET /settings/instagram`, `GET /contacts` etc. nos logs do backend) e worker processando eventos reais da fila `instagram-events` |
 
 ### Bugs corrigidos no deploy real (não apareciam em build local)
 
