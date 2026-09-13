@@ -44,7 +44,7 @@ export async function settingsRoutes(app: FastifyInstance) {
   });
 }
 
-async function checkInstagramConnection(
+export async function checkInstagramConnection(
   token: string,
   igUserId: string,
   version: string,
