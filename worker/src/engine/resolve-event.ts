@@ -1,5 +1,6 @@
 import { getPrisma, type Prisma } from "@dmflow/db";
 import { advanceFlowRun } from "./executor";
+import { interpolate, sendPublicCommentReply } from "../services/instagram";
 
 const prisma = getPrisma();
 
@@ -39,6 +40,15 @@ export async function resolveEvent(event: InstagramEvent): Promise<void> {
     // ("o que a pessoa falou") — não dispara nada, só registro (RF02).
     await prisma.message.create({ data: { contactId: contact.id, direction: "inbound", content: event.text } });
     if (!trigger) return; // RF02: comentário sem match, ignora
+
+    if (trigger.publicReplyText) {
+      // "Growth tool" tipo ManyChat: responde publicamente no comentário
+      // (prova social) antes de seguir com a automação em privado. Erro aqui
+      // não deve travar o fluxo — só loga.
+      await sendPublicCommentReply(event.commentId, interpolate(trigger.publicReplyText, contact)).catch((err) =>
+        console.error(`[worker] resposta pública do trigger ${trigger.id} falhou:`, (err as Error).message),
+      );
+    }
 
     await startFlowRun(contact.id, trigger, {
       originCommentId: event.commentId,
@@ -80,7 +90,7 @@ export async function resolveEvent(event: InstagramEvent): Promise<void> {
 async function findCommentTrigger(
   postId: string,
   text: string,
-): Promise<{ id: string; flowId: string } | null> {
+): Promise<{ id: string; flowId: string; publicReplyText: string | null } | null> {
   const candidates = await prisma.postTrigger.findMany({
     where: { type: "comment", postId, active: true },
   });

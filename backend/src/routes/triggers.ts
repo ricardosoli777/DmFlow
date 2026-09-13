@@ -8,6 +8,7 @@ const createSchema = z
     type: z.enum(["comment", "dm_keyword"]).default("comment"),
     postId: z.string().optional(),
     keyword: z.string().optional(),
+    publicReplyText: z.string().optional(),
     flowId: z.string().uuid(),
   })
   .refine((body) => body.type !== "comment" || !!body.postId, {
@@ -23,6 +24,7 @@ const updateSchema = z.object({
   active: z.boolean().optional(),
   keyword: z.string().nullable().optional(),
   postId: z.string().nullable().optional(),
+  publicReplyText: z.string().nullable().optional(),
   flowId: z.string().uuid().optional(),
 });
 
@@ -45,7 +47,13 @@ export async function triggerRoutes(app: FastifyInstance) {
   app.post("/triggers", async (req, reply) => {
     const body = createSchema.parse(req.body);
     const trigger = await prisma.postTrigger.create({
-      data: { type: body.type, postId: body.postId, keyword: body.keyword, flowId: body.flowId },
+      data: {
+        type: body.type,
+        postId: body.postId,
+        keyword: body.keyword,
+        publicReplyText: body.type === "comment" ? body.publicReplyText : undefined,
+        flowId: body.flowId,
+      },
     });
     return reply.status(201).send(trigger);
   });
