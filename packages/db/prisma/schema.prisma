@@ -55,6 +55,10 @@ model PostTrigger {
   type      String   @default("comment")
   postId    String?
   keyword   String?
+  // Resposta pública opcional no próprio comentário (só faz sentido pra
+  // type: "comment") — sai antes da DM/Private Reply, tipo "growth tool" do
+  // ManyChat: prova social pública + a automação continua em privado.
+  publicReplyText String?
   active    Boolean  @default(true)
   flowId    String
   flow      Flow     @relation(fields: [flowId], references: [id])
