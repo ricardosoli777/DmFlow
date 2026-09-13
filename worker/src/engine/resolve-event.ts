@@ -1,6 +1,6 @@
 import { getPrisma, type Prisma } from "@dmflow/db";
 import { advanceFlowRun } from "./executor";
-import { interpolate, sendPublicCommentReply } from "../services/instagram";
+import { fetchInstagramProfile, interpolate, sendPublicCommentReply } from "../services/instagram";
 
 const prisma = getPrisma();
 
@@ -24,7 +24,7 @@ export type InstagramEvent = CommentEvent | MessageEvent;
 // RF01, RF02, RNF01 — decide qual trigger/flow_run corresponde a um evento
 // cru, e marca a abertura da janela de 24h de mensagens.
 export async function resolveEvent(event: InstagramEvent): Promise<void> {
-  const contact = await prisma.contact.upsert({
+  let contact = await prisma.contact.upsert({
     where: { igsid: event.fromIgsid },
     update: { lastInboundAt: new Date() },
     create: {
@@ -33,6 +33,19 @@ export async function resolveEvent(event: InstagramEvent): Promise<void> {
       lastInboundAt: new Date(),
     },
   });
+
+  // Contato sem nome/username salvo (típico de quem chegou só por DM, já que
+  // o webhook de `messages` não manda o nome junto) — busca na Graph API pra
+  // {{name}} funcionar igual funciona pra quem veio de comentário.
+  if (!contact.name && !contact.username) {
+    const profile = await fetchInstagramProfile(contact.igsid);
+    if (profile?.name || profile?.username) {
+      contact = await prisma.contact.update({
+        where: { id: contact.id },
+        data: { name: profile.name, username: profile.username, avatarUrl: profile.profilePic },
+      });
+    }
+  }
 
   if (event.kind === "comment") {
     const trigger = await findCommentTrigger(event.postId, event.text);

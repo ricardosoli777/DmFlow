@@ -1,5 +1,6 @@
 // Envio real via Instagram Messaging API — RF03, RNF01.
 // Docs: docs/04-integracao-meta.md
+import type { Contact } from "@dmflow/db";
 import { getMetaSettings, getPrisma } from "@dmflow/db";
 
 const prisma = getPrisma();
@@ -22,13 +23,27 @@ export type ButtonAction =
 
 type QuickReply = ButtonAction;
 
-// Personalização simples nas mensagens — {{name}}/{{username}} viram o nome
-// do contato (ou "" se não tiver). Mesma ideia do ManyChat, sem exigir editor
-// visual de variável: quem escreve o texto do node só digita `{{name}}`.
-export function interpolate(text: string, contact: { name: string | null; username: string | null }): string {
-  return text
-    .replace(/\{\{\s*name\s*\}\}/gi, contact.name ?? contact.username ?? "")
-    .replace(/\{\{\s*username\s*\}\}/gi, contact.username ?? "");
+// Personalização nas mensagens — {{name}}/{{username}}/{{first_name}}/{{tags}}
+// viram dados do contato, e qualquer outro {{campo}} é procurado nos
+// atributos capturados pelo fluxo (node "Capturar resposta"). Mesma ideia do
+// ManyChat: quem escreve o texto só digita a chave entre chaves duplas — o
+// seletor de variáveis no editor (frontend) insere isso automaticamente.
+export function interpolate(text: string, contact: Contact): string {
+  const name = contact.name ?? contact.username ?? "";
+  const builtins: Record<string, string> = {
+    name,
+    username: contact.username ?? "",
+    first_name: name.split(" ")[0] ?? "",
+    tags: contact.tags.join(", "),
+  };
+  const attributes = (contact.attributes as Record<string, unknown>) ?? {};
+
+  return text.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (match, key: string) => {
+    const lowerKey = key.toLowerCase();
+    if (lowerKey in builtins) return builtins[lowerKey];
+    if (key in attributes) return String(attributes[key] ?? "");
+    return match; // variável desconhecida — deixa como está em vez de apagar
+  });
 }
 
 function toGraphButton(action: ButtonAction): Record<string, string> {
@@ -166,6 +181,39 @@ export async function sendPrivateReply(commentId: string, igsid: string, text: s
 export async function sendPublicCommentReply(commentId: string, text: string): Promise<void> {
   const settings = await getMetaSettings();
   await callGraphApi(settings, `/${commentId}/replies`, { message: text });
+}
+
+/**
+ * Busca nome/username/foto de um contato direto na Graph API — usado quando
+ * o contato chegou só por DM (o webhook de `messages` não manda o nome
+ * junto, diferente do de `comments`), pra `{{name}}` não ficar vazio.
+ * Só funciona pra usuários dentro da janela de mensagens ativa com a conta.
+ */
+export async function fetchInstagramProfile(
+  igsid: string,
+): Promise<{ name?: string; username?: string; profilePic?: string } | null> {
+  const settings = await getMetaSettings();
+  if (!settings.pageAccessToken) return null;
+
+  try {
+    const res = await fetch(
+      `https://graph.instagram.com/${settings.graphApiVersion}/${igsid}?fields=name,username,profile_pic&access_token=${settings.pageAccessToken}`,
+    );
+    const data = (await res.json()) as {
+      name?: string;
+      username?: string;
+      profile_pic?: string;
+      error?: { message?: string };
+    };
+    if (!res.ok || data.error) {
+      console.warn(`[worker] não consegui buscar perfil de ${igsid}:`, data.error?.message ?? res.status);
+      return null;
+    }
+    return { name: data.name, username: data.username, profilePic: data.profile_pic };
+  } catch (err) {
+    console.warn(`[worker] erro buscando perfil de ${igsid}:`, (err as Error).message);
+    return null;
+  }
 }
 
 function isWithinMessagingWindow(lastInboundAt: Date | null): boolean {
