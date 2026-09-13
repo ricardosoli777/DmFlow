@@ -1,8 +1,10 @@
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
+import { useRef } from "react";
 import { useFlowEditorStore } from "@/stores/flow-editor.store";
 import { Button } from "@/components/ui/button";
+import { BUILTIN_VARIABLES, VariablePicker } from "@/components/ui/variable-picker";
 
 type ButtonOption = { label: string; next?: string; url?: string };
 
@@ -14,6 +16,16 @@ const selectClass =
 export function NodeInspector() {
   const { nodes, selectedNodeId, updateNodeData, deleteNode, selectNode } = useFlowEditorStore();
   const node = nodes.find((n) => n.id === selectedNodeId);
+  const textRef = useRef<HTMLTextAreaElement>(null);
+  const promptRef = useRef<HTMLTextAreaElement>(null);
+
+  // Campos capturados por nodes "Capturar resposta" no fluxo inteiro viram
+  // variáveis disponíveis também (ex: {{email}} depois de um node que captura
+  // "email") — mesma lógica de campo customizado do ManyChat.
+  const captureVariables = nodes
+    .filter((n) => n.data.type === "capture" && n.data.field)
+    .map((n) => ({ key: String(n.data.field), label: String(n.data.field) }));
+  const availableVariables = [...BUILTIN_VARIABLES, ...captureVariables];
 
   if (!node) {
     return (
@@ -60,13 +72,17 @@ export function NodeInspector() {
         <label className="flex flex-col gap-1 text-sm">
           Texto
           <textarea
+            ref={textRef}
             className="min-h-[80px] rounded-[var(--radius)] border border-border bg-background p-2 text-sm outline-none focus:ring-2 focus:ring-primary"
             value={(node.data.text as string) ?? ""}
             onChange={(e) => updateNodeData(node.id, { text: e.target.value })}
           />
-          <span className="text-xs text-muted-foreground">
-            Use <code>{"{{name}}"}</code> ou <code>{"{{username}}"}</code> pra personalizar com o nome do contato.
-          </span>
+          <VariablePicker
+            variables={availableVariables}
+            fieldRef={textRef}
+            value={(node.data.text as string) ?? ""}
+            onChange={(v) => updateNodeData(node.id, { text: v })}
+          />
         </label>
       )}
 
@@ -74,9 +90,16 @@ export function NodeInspector() {
         <label className="flex flex-col gap-1 text-sm">
           Pergunta (o que o bot envia antes de esperar a resposta)
           <textarea
+            ref={promptRef}
             className="min-h-[80px] rounded-[var(--radius)] border border-border bg-background p-2 text-sm outline-none focus:ring-2 focus:ring-primary"
             value={(node.data.prompt as string) ?? ""}
             onChange={(e) => updateNodeData(node.id, { prompt: e.target.value })}
+          />
+          <VariablePicker
+            variables={availableVariables}
+            fieldRef={promptRef}
+            value={(node.data.prompt as string) ?? ""}
+            onChange={(v) => updateNodeData(node.id, { prompt: v })}
           />
           <span className="mt-1">Salvar resposta no campo</span>
           <input

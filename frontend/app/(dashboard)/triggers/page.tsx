@@ -2,11 +2,12 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, FlaskConical, Pause, Play, RefreshCw, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { BUILTIN_VARIABLES, VariablePicker } from "@/components/ui/variable-picker";
 
 type TriggerType = "comment" | "dm_keyword";
 
@@ -49,6 +50,7 @@ export default function TriggersPage() {
   const [postId, setPostId] = useState("");
   const [keyword, setKeyword] = useState("");
   const [publicReplyText, setPublicReplyText] = useState("");
+  const publicReplyRef = useRef<HTMLInputElement>(null);
   const [flowId, setFlowId] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -292,15 +294,18 @@ export default function TriggersPage() {
               <label className="flex flex-col gap-1 text-sm">
                 Resposta pública no comentário (opcional — some antes da DM, tipo prova social)
                 <input
+                  ref={publicReplyRef}
                   className="rounded-[var(--radius)] border border-border bg-background p-2 text-sm outline-none focus:ring-2 focus:ring-primary"
                   placeholder="ex: {{name}}, te chamei no DM! 📩"
                   value={publicReplyText}
                   onChange={(e) => setPublicReplyText(e.target.value)}
                 />
-                <span className="text-xs text-muted-foreground">
-                  Use <code>{"{{name}}"}</code> ou <code>{"{{username}}"}</code> pra personalizar — também funciona
-                  no texto de qualquer node do fluxo.
-                </span>
+                <VariablePicker
+                  variables={BUILTIN_VARIABLES}
+                  fieldRef={publicReplyRef}
+                  value={publicReplyText}
+                  onChange={setPublicReplyText}
+                />
               </label>
             )}
 
@@ -420,6 +425,9 @@ function TriggerRow(props: {
     enabled: expanded,
   });
 
+  const [publicReplyDraft, setPublicReplyDraft] = useState(t.publicReplyText ?? "");
+  const publicReplyEditRef = useRef<HTMLInputElement>(null);
+
   return (
     <>
       <tr className="border-b border-border last:border-0">
@@ -537,12 +545,20 @@ function TriggerRow(props: {
                   Resposta pública no comentário (opcional)
                 </label>
                 <input
+                  ref={publicReplyEditRef}
                   className="w-full max-w-md rounded-[var(--radius)] border border-border bg-background p-1.5 text-xs outline-none focus:ring-2 focus:ring-primary"
-                  defaultValue={t.publicReplyText ?? ""}
+                  value={publicReplyDraft}
                   placeholder="sem resposta pública configurada"
-                  onBlur={(e) => {
-                    if (e.target.value !== (t.publicReplyText ?? "")) props.onChangePublicReply(e.target.value);
+                  onChange={(e) => setPublicReplyDraft(e.target.value)}
+                  onBlur={() => {
+                    if (publicReplyDraft !== (t.publicReplyText ?? "")) props.onChangePublicReply(publicReplyDraft);
                   }}
+                />
+                <VariablePicker
+                  variables={BUILTIN_VARIABLES}
+                  fieldRef={publicReplyEditRef}
+                  value={publicReplyDraft}
+                  onChange={setPublicReplyDraft}
                 />
               </div>
             )}
