@@ -1,20 +1,32 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pause, Play, RefreshCw, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, FlaskConical, Pause, Play, RefreshCw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
+type TriggerType = "comment" | "dm_keyword";
+
 type Trigger = {
   id: string;
-  postId: string;
+  type: TriggerType;
+  postId: string | null;
   keyword: string | null;
   active: boolean;
   hitCount: number;
   flow: { name: string };
+};
+
+type TriggerDetail = Trigger & {
+  flowRuns: {
+    id: string;
+    status: string;
+    createdAt: string;
+    contact: { name: string | null; username: string | null; igsid: string };
+  }[];
 };
 
 type Flow = { id: string; name: string };
@@ -32,6 +44,7 @@ type IgMedia = {
 export default function TriggersPage() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+  const [type, setType] = useState<TriggerType>("comment");
   const [postId, setPostId] = useState("");
   const [keyword, setKeyword] = useState("");
   const [flowId, setFlowId] = useState("");
@@ -44,10 +57,12 @@ export default function TriggersPage() {
 
   const [editingKeywordId, setEditingKeywordId] = useState<string | null>(null);
   const [keywordDraft, setKeywordDraft] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{ id: string; message: string } | null>(null);
 
   const updateTrigger = useMutation({
-    mutationFn: ({ id, ...patch }: { id: string; active?: boolean; keyword?: string | null }) =>
+    mutationFn: ({ id, ...patch }: { id: string; active?: boolean; keyword?: string | null; flowId?: string }) =>
       api.patch(`/triggers/${id}`, patch),
     onSuccess: () => {
       setActionError(null);
@@ -65,6 +80,19 @@ export default function TriggersPage() {
     onError: (err: unknown) => setActionError(err instanceof Error ? err.message : "Não foi possível excluir."),
   });
 
+  const testTrigger = useMutation({
+    mutationFn: (id: string) => api.post<{ testContactIgsid: string }>(`/triggers/${id}/test`, {}),
+    onSuccess: (res, id) => {
+      setTestResult({
+        id,
+        message: `Evento de teste enviado (contato ${res.testContactIgsid}). Acompanhe em Contatos/Inbox em alguns segundos.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["triggers"] });
+    },
+    onError: (err: unknown) =>
+      setTestResult({ id: "", message: err instanceof Error ? err.message : "Falha ao disparar teste." }),
+  });
+
   function startEditingKeyword(t: Trigger) {
     setEditingKeywordId(t.id);
     setKeywordDraft(t.keyword ?? "");
@@ -76,7 +104,8 @@ export default function TriggersPage() {
   }
 
   function handleDeleteTrigger(t: Trigger) {
-    if (!window.confirm(`Excluir esta automação (post ${t.postId})? Essa ação não pode ser desfeita.`)) return;
+    const label = t.type === "comment" ? `post ${t.postId}` : `DM "${t.keyword}"`;
+    if (!window.confirm(`Excluir esta automação (${label})? Essa ação não pode ser desfeita.`)) return;
     deleteTrigger.mutate(t.id);
   }
 
@@ -96,12 +125,17 @@ export default function TriggersPage() {
   } = useQuery({
     queryKey: ["instagram-media"],
     queryFn: () => api.get<{ media: IgMedia[] }>("/instagram/media"),
-    enabled: showForm,
+    enabled: showForm && type === "comment",
   });
 
   const create = useMutation({
     mutationFn: () =>
-      api.post("/triggers", { postId, keyword: keyword.trim() || undefined, flowId }),
+      api.post("/triggers", {
+        type,
+        postId: type === "comment" ? postId : undefined,
+        keyword: keyword.trim() || undefined,
+        flowId,
+      }),
     onSuccess: () => {
       setShowForm(false);
       setPostId("");
@@ -115,8 +149,16 @@ export default function TriggersPage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!postId.trim() || !flowId) {
-      setError("Escolha um post/reel e um fluxo.");
+    if (!flowId) {
+      setError("Escolha um fluxo.");
+      return;
+    }
+    if (type === "comment" && !postId.trim()) {
+      setError("Escolha um post/reel.");
+      return;
+    }
+    if (type === "dm_keyword" && !keyword.trim()) {
+      setError("Informe a palavra-chave que a pessoa vai mandar por DM.");
       return;
     }
     create.mutate();
@@ -132,74 +174,99 @@ export default function TriggersPage() {
       {showForm && (
         <Card>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-6">
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Escolha o post/reel</span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => refetchMedia()}
-                  disabled={refreshingMedia}
-                >
-                  <RefreshCw size={14} className={refreshingMedia ? "animate-spin" : ""} />
-                  Atualizar
-                </Button>
-              </div>
-
-              {loadingMedia && <p className="text-sm text-muted-foreground">Buscando posts e reels...</p>}
-
-              {mediaError && (
-                <p className="text-sm text-danger">
-                  {mediaError instanceof Error ? mediaError.message : "Erro ao buscar posts"} — verifique a
-                  conexão em Configurações.
-                </p>
-              )}
-
-              {!loadingMedia && !mediaError && (mediaData?.media?.length ?? 0) === 0 && (
-                <p className="text-sm text-muted-foreground">Nenhum post/reel encontrado na conta conectada.</p>
-              )}
-
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
-                {(mediaData?.media ?? []).map((m) => {
-                  const thumb = m.thumbnail_url || m.media_url;
-                  const selected = postId === m.id;
-                  return (
-                    <button
-                      type="button"
-                      key={m.id}
-                      onClick={() => setPostId(m.id)}
-                      title={m.caption}
-                      className={`group relative aspect-square overflow-hidden rounded-[var(--radius)] border-2 ${
-                        selected ? "border-primary" : "border-transparent"
-                      }`}
-                    >
-                      {thumb ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={thumb} alt={m.caption ?? ""} className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-muted text-xs text-muted-foreground">
-                          sem preview
-                        </div>
-                      )}
-                      {m.media_type === "VIDEO" && (
-                        <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1 text-[10px] text-white">
-                          Reel
-                        </span>
-                      )}
-                      {selected && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-primary/30">
-                          <Badge variant="ativo">Selecionado</Badge>
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setType("comment")}
+                className={`rounded-[var(--radius)] border px-3 py-1.5 text-sm ${
+                  type === "comment" ? "border-primary bg-primary/10 text-primary" : "border-border"
+                }`}
+              >
+                Comentário em post/reel
+              </button>
+              <button
+                type="button"
+                onClick={() => setType("dm_keyword")}
+                className={`rounded-[var(--radius)] border px-3 py-1.5 text-sm ${
+                  type === "dm_keyword" ? "border-primary bg-primary/10 text-primary" : "border-border"
+                }`}
+              >
+                DM com palavra-chave
+              </button>
             </div>
 
+            {type === "comment" && (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Escolha o post/reel</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => refetchMedia()}
+                    disabled={refreshingMedia}
+                  >
+                    <RefreshCw size={14} className={refreshingMedia ? "animate-spin" : ""} />
+                    Atualizar
+                  </Button>
+                </div>
+
+                {loadingMedia && <p className="text-sm text-muted-foreground">Buscando posts e reels...</p>}
+
+                {mediaError && (
+                  <p className="text-sm text-danger">
+                    {mediaError instanceof Error ? mediaError.message : "Erro ao buscar posts"} — verifique a
+                    conexão em Configurações.
+                  </p>
+                )}
+
+                {!loadingMedia && !mediaError && (mediaData?.media?.length ?? 0) === 0 && (
+                  <p className="text-sm text-muted-foreground">Nenhum post/reel encontrado na conta conectada.</p>
+                )}
+
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                  {(mediaData?.media ?? []).map((m) => {
+                    const thumb = m.thumbnail_url || m.media_url;
+                    const selected = postId === m.id;
+                    return (
+                      <button
+                        type="button"
+                        key={m.id}
+                        onClick={() => setPostId(m.id)}
+                        title={m.caption}
+                        className={`group relative aspect-square overflow-hidden rounded-[var(--radius)] border-2 ${
+                          selected ? "border-primary" : "border-transparent"
+                        }`}
+                      >
+                        {thumb ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={thumb} alt={m.caption ?? ""} className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-muted text-xs text-muted-foreground">
+                            sem preview
+                          </div>
+                        )}
+                        {m.media_type === "VIDEO" && (
+                          <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1 text-[10px] text-white">
+                            Reel
+                          </span>
+                        )}
+                        {selected && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-primary/30">
+                            <Badge variant="ativo">Selecionado</Badge>
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <label className="flex flex-col gap-1 text-sm">
-              Palavra-chave (deixe em branco pra disparar em qualquer comentário)
+              {type === "comment"
+                ? "Palavra-chave (deixe em branco pra disparar em qualquer comentário)"
+                : "Palavra-chave (obrigatória — pode ser parte da mensagem, não precisa ser exata)"}
               <input
                 className="rounded-[var(--radius)] border border-border bg-background p-2 text-sm outline-none focus:ring-2 focus:ring-primary"
                 placeholder="ex: quero, eu, link"
@@ -244,8 +311,9 @@ export default function TriggersPage() {
         <table className="w-full text-sm">
           <thead className="border-b border-border bg-muted/50 text-left text-muted-foreground">
             <tr>
-              <th className="p-4 font-medium">Post</th>
-              <th className="p-4 font-medium">Palavra-chave</th>
+              <th className="p-4 font-medium" />
+              <th className="p-4 font-medium">Tipo</th>
+              <th className="p-4 font-medium">Post / Palavra-chave</th>
               <th className="p-4 font-medium">Fluxo</th>
               <th className="p-4 font-medium">Disparos</th>
               <th className="p-4 font-medium">Status</th>
@@ -254,67 +322,34 @@ export default function TriggersPage() {
           </thead>
           <tbody>
             {(triggers ?? []).map((t) => (
-              <tr key={t.id} className="border-b border-border last:border-0">
-                <td className="max-w-[200px] truncate p-4 font-mono text-xs" title={t.postId}>
-                  {t.postId}
-                </td>
-                <td className="p-4">
-                  {editingKeywordId === t.id ? (
-                    <input
-                      autoFocus
-                      className="w-32 rounded-[var(--radius)] border border-border bg-background p-1.5 text-xs outline-none focus:ring-2 focus:ring-primary"
-                      value={keywordDraft}
-                      placeholder="qualquer comentário"
-                      onChange={(e) => setKeywordDraft(e.target.value)}
-                      onBlur={() => saveKeyword(t.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") saveKeyword(t.id);
-                        if (e.key === "Escape") setEditingKeywordId(null);
-                      }}
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => startEditingKeyword(t)}
-                      className="rounded px-1.5 py-0.5 text-left hover:bg-muted"
-                      title="Clique pra editar"
-                    >
-                      {t.keyword ?? <span className="text-muted-foreground">qualquer comentário</span>}
-                    </button>
-                  )}
-                </td>
-                <td className="p-4">{t.flow.name}</td>
-                <td className="p-4">{t.hitCount}</td>
-                <td className="p-4">
-                  <Badge variant={t.active ? "ativo" : "pausado"}>{t.active ? "Ativo" : "Pausado"}</Badge>
-                </td>
-                <td className="p-4">
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => updateTrigger.mutate({ id: t.id, active: !t.active })}
-                      disabled={updateTrigger.isPending}
-                      className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                      title={t.active ? "Pausar automação" : "Reativar automação"}
-                    >
-                      {t.active ? <Pause size={14} /> : <Play size={14} />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteTrigger(t)}
-                      disabled={deleteTrigger.isPending}
-                      className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-danger"
-                      title="Excluir automação"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
+              <TriggerRow
+                key={t.id}
+                trigger={t}
+                flows={flows ?? []}
+                expanded={expandedId === t.id}
+                onToggleExpand={() => setExpandedId(expandedId === t.id ? null : t.id)}
+                editingKeyword={editingKeywordId === t.id}
+                keywordDraft={keywordDraft}
+                onStartEditKeyword={() => startEditingKeyword(t)}
+                onKeywordDraftChange={setKeywordDraft}
+                onSaveKeyword={() => saveKeyword(t.id)}
+                onCancelEditKeyword={() => setEditingKeywordId(null)}
+                onToggleActive={() => updateTrigger.mutate({ id: t.id, active: !t.active })}
+                onChangeFlow={(newFlowId) => updateTrigger.mutate({ id: t.id, flowId: newFlowId })}
+                onDelete={() => handleDeleteTrigger(t)}
+                onTest={() => {
+                  setTestResult(null);
+                  testTrigger.mutate(t.id);
+                }}
+                testing={testTrigger.isPending}
+                testResult={testResult?.id === t.id ? testResult.message : null}
+                updatePending={updateTrigger.isPending}
+                deletePending={deleteTrigger.isPending}
+              />
             ))}
             {!triggers?.length && (
               <tr>
-                <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                <td colSpan={7} className="p-8 text-center text-muted-foreground">
                   Nenhum trigger criado ainda.
                 </td>
               </tr>
@@ -323,5 +358,168 @@ export default function TriggersPage() {
         </table>
       </Card>
     </div>
+  );
+}
+
+function TriggerRow(props: {
+  trigger: Trigger;
+  flows: Flow[];
+  expanded: boolean;
+  onToggleExpand: () => void;
+  editingKeyword: boolean;
+  keywordDraft: string;
+  onStartEditKeyword: () => void;
+  onKeywordDraftChange: (v: string) => void;
+  onSaveKeyword: () => void;
+  onCancelEditKeyword: () => void;
+  onToggleActive: () => void;
+  onChangeFlow: (flowId: string) => void;
+  onDelete: () => void;
+  onTest: () => void;
+  testing: boolean;
+  testResult: string | null;
+  updatePending: boolean;
+  deletePending: boolean;
+}) {
+  const { trigger: t, expanded } = props;
+
+  const { data: detail } = useQuery({
+    queryKey: ["trigger-detail", t.id],
+    queryFn: () => api.get<TriggerDetail>(`/triggers/${t.id}`),
+    enabled: expanded,
+  });
+
+  return (
+    <>
+      <tr className="border-b border-border last:border-0">
+        <td className="p-4">
+          <button
+            type="button"
+            onClick={props.onToggleExpand}
+            className="rounded p-1 text-muted-foreground hover:bg-muted"
+            title="Abrir detalhes"
+          >
+            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </button>
+        </td>
+        <td className="p-4">
+          <Badge variant={t.type === "comment" ? "rascunho" : "ativo"}>
+            {t.type === "comment" ? "Comentário" : "DM"}
+          </Badge>
+        </td>
+        <td className="p-4">
+          {t.type === "comment" ? (
+            <span className="max-w-[160px] truncate font-mono text-xs" title={t.postId ?? ""}>
+              {t.postId}
+            </span>
+          ) : props.editingKeyword ? (
+            <input
+              autoFocus
+              className="w-32 rounded-[var(--radius)] border border-border bg-background p-1.5 text-xs outline-none focus:ring-2 focus:ring-primary"
+              value={props.keywordDraft}
+              onChange={(e) => props.onKeywordDraftChange(e.target.value)}
+              onBlur={props.onSaveKeyword}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") props.onSaveKeyword();
+                if (e.key === "Escape") props.onCancelEditKeyword();
+              }}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={props.onStartEditKeyword}
+              className="rounded px-1.5 py-0.5 text-left hover:bg-muted"
+              title="Clique pra editar"
+            >
+              {t.keyword ?? <span className="text-muted-foreground">qualquer comentário</span>}
+            </button>
+          )}
+        </td>
+        <td className="p-4">
+          <select
+            className="rounded-[var(--radius)] border border-border bg-background p-1.5 text-xs outline-none focus:ring-2 focus:ring-primary"
+            value={t.flow.name}
+            onChange={(e) => {
+              const f = props.flows.find((fl) => fl.name === e.target.value);
+              if (f) props.onChangeFlow(f.id);
+            }}
+          >
+            <option value={t.flow.name}>{t.flow.name}</option>
+            {props.flows
+              .filter((f) => f.name !== t.flow.name)
+              .map((f) => (
+                <option key={f.id} value={f.name}>
+                  {f.name}
+                </option>
+              ))}
+          </select>
+        </td>
+        <td className="p-4">{t.hitCount}</td>
+        <td className="p-4">
+          <Badge variant={t.active ? "ativo" : "pausado"}>{t.active ? "Ativo" : "Pausado"}</Badge>
+        </td>
+        <td className="p-4">
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={props.onTest}
+              disabled={props.testing}
+              className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-primary"
+              title="Disparar um evento de teste pra esse trigger"
+            >
+              <FlaskConical size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={props.onToggleActive}
+              disabled={props.updatePending}
+              className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+              title={t.active ? "Pausar automação" : "Reativar automação"}
+            >
+              {t.active ? <Pause size={14} /> : <Play size={14} />}
+            </button>
+            <button
+              type="button"
+              onClick={props.onDelete}
+              disabled={props.deletePending}
+              className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-danger"
+              title="Excluir automação"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        </td>
+      </tr>
+      {props.testResult && (
+        <tr className="border-b border-border last:border-0 bg-muted/30">
+          <td colSpan={7} className="px-4 py-2 text-xs text-muted-foreground">
+            {props.testResult}
+          </td>
+        </tr>
+      )}
+      {expanded && (
+        <tr className="border-b border-border bg-muted/20 last:border-0">
+          <td colSpan={7} className="p-4">
+            <p className="mb-2 text-xs font-medium text-muted-foreground">Últimos disparos deste trigger</p>
+            {!detail && <p className="text-xs text-muted-foreground">Carregando...</p>}
+            {detail && detail.flowRuns.length === 0 && (
+              <p className="text-xs text-muted-foreground">Ainda não disparou nenhum flow_run.</p>
+            )}
+            {detail && detail.flowRuns.length > 0 && (
+              <ul className="flex flex-col gap-1">
+                {detail.flowRuns.map((run) => (
+                  <li key={run.id} className="flex items-center justify-between text-xs">
+                    <span>{run.contact.name ?? run.contact.username ?? run.contact.igsid}</span>
+                    <span className="text-muted-foreground">
+                      {run.status} — {new Date(run.createdAt).toLocaleString("pt-BR")}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
