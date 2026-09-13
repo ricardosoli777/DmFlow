@@ -21,6 +21,7 @@ model Contact {
   id            String     @id @default(uuid())
   igsid         String     @unique
   name          String?
+  username      String?
   avatarUrl     String?
   tags          String[]   @default([])
   attributes    Json       @default("{}")
@@ -49,28 +50,35 @@ model Flow {
 
 model PostTrigger {
   id        String   @id @default(uuid())
-  postId    String
+  // "comment" (comentário em post/reel, exige postId) | "dm_keyword" (DM direta
+  // com palavra-chave, sem post associado)
+  type      String   @default("comment")
+  postId    String?
   keyword   String?
   active    Boolean  @default(true)
   flowId    String
   flow      Flow     @relation(fields: [flowId], references: [id])
   hitCount  Int      @default(0)
   createdAt DateTime @default(now())
+  flowRuns  FlowRun[]
 
   @@map("posts_triggers")
 }
 
 model FlowRun {
-  id         String   @id @default(uuid())
-  contactId  String
-  contact    Contact  @relation(fields: [contactId], references: [id])
-  flowId     String
-  flow       Flow     @relation(fields: [flowId], references: [id])
+  id          String       @id @default(uuid())
+  contactId   String
+  contact     Contact      @relation(fields: [contactId], references: [id])
+  flowId      String
+  flow        Flow         @relation(fields: [flowId], references: [id])
+  // Trigger que originou este flow_run (null se criado manualmente/teste sem trigger real)
+  triggerId   String?
+  trigger     PostTrigger? @relation(fields: [triggerId], references: [id])
   currentNode String
-  status     String   @default("running") // running | waiting | done | error
-  context    Json     @default("{}")
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  status      String       @default("running") // running | waiting | done | error
+  context     Json         @default("{}")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   @@map("flow_runs")
 }
