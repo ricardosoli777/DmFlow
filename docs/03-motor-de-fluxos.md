@@ -28,21 +28,22 @@ JSON. Cada contato tem um `flow_run` que aponta pro node atual + um contexto
 ## O que dispara um fluxo (trigger)
 
 Um **trigger** é o evento que faz o `worker` criar um `flow_run` novo pra um
-contato. Hoje só existe um tipo implementado; os outros são só automação de
-Instagram conhecida no mercado, ainda não construída aqui — servem de lista
-pra decidir o que vale a pena adicionar depois.
+contato. Hoje existem dois tipos implementados (`PostTrigger.type`); os
+outros são só automação de Instagram conhecida no mercado, ainda não
+construída aqui — servem de lista pra decidir o que vale a pena adicionar
+depois.
 
 ### Implementado
 
 | Trigger | Como funciona | Onde configurar |
 |---|---|---|
-| **Comentário em post/reel** | Alguém comenta num post específico (com palavra-chave opcional) → dispara o fluxo escolhido. Webhook `comments` da Meta. | `/triggers` no dashboard |
+| **Comentário em post/reel** (`type: comment`) | Alguém comenta num post específico → dispara o fluxo escolhido. Sem palavra-chave, dispara em **qualquer** comentário do post; com palavra-chave, dispara quando o comentário **contiver** essa palavra (não precisa ser idêntico). Se o post tiver os dois tipos de trigger cadastrados, a palavra-chave específica tem prioridade sobre o "qualquer". Webhook `comments` da Meta. | `/triggers` no dashboard |
+| **DM com palavra-chave** (`type: dm_keyword`) | Alguém manda uma DM direta pra conta, sem ter comentado nada, contendo uma palavra específica → dispara um fluxo. Só é avaliado quando a pessoa **não tem** nenhum `flow_run` ativo esperando resposta (senão a mensagem é tratada como resposta ao fluxo em andamento). Match por "contém", igual ao de comentário. Webhook `messages`. | `/triggers` no dashboard |
 
 ### Não implementado (candidatos pra adicionar)
 
 | Trigger | O que seria | Webhook/API envolvido | Complexidade |
 |---|---|---|---|
-| **DM com palavra-chave** | Alguém manda uma mensagem direta pra conta (sem ter comentado nada) contendo uma palavra específica → dispara um fluxo | Webhook `messages` (já chega no backend, hoje só reage a `flow_run` existente — precisaria checar se não há run ativo e casar a palavra-chave antes de ignorar) | Baixa — reaproveita quase tudo que já existe |
 | **Resposta a Story** | Usuário responde (reply) a um story publicado pela conta → dispara um fluxo | Webhook `messages` com campo `reply_to.story` preenchido | Baixa/média — é uma variação do trigger de DM, só muda a detecção |
 | **Menção em post/story de terceiros** | Alguém marca a conta em post ou story próprio → dispara um fluxo (ex: agradecimento automático) | Webhook `mentions` (permissão `instagram_manage_mentions`) | Média — precisa de permissão nova no app da Meta e um endpoint de webhook novo |
 | **Clique em anúncio (Click-to-Instagram/CTWA)** | Alguém clica num anúncio configurado pra abrir DM → a primeira mensagem chega com um `referral` de campanha → dispara um fluxo específico daquele anúncio | Webhook `messages`, campo `referral` | Média — precisa mapear `ref`/`ad_id` pra um fluxo, parecido com o trigger de post mas pra anúncios |

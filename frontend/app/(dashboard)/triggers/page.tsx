@@ -265,8 +265,8 @@ export default function TriggersPage() {
 
             <label className="flex flex-col gap-1 text-sm">
               {type === "comment"
-                ? "Palavra-chave (deixe em branco pra disparar em qualquer comentário)"
-                : "Palavra-chave (obrigatória — pode ser parte da mensagem, não precisa ser exata)"}
+                ? "Palavra-chave (deixe em branco pra disparar em qualquer comentário; se preencher, dispara quando o comentário CONTIVER essa palavra)"
+                : "Palavra-chave (obrigatória — dispara quando a DM CONTIVER essa palavra, não precisa ser a mensagem inteira)"}
               <input
                 className="rounded-[var(--radius)] border border-border bg-background p-2 text-sm outline-none focus:ring-2 focus:ring-primary"
                 placeholder="ex: quero, eu, link"

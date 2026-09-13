@@ -34,14 +34,7 @@ export async function resolveEvent(event: InstagramEvent): Promise<void> {
   });
 
   if (event.kind === "comment") {
-    const trigger = await prisma.postTrigger.findFirst({
-      where: {
-        type: "comment",
-        postId: event.postId,
-        active: true,
-        OR: [{ keyword: null }, { keyword: { equals: event.text, mode: "insensitive" } }],
-      },
-    });
+    const trigger = await findCommentTrigger(event.postId, event.text);
     // Guarda o comentário mesmo sem match, pra aparecer no histórico/dashboard
     // ("o que a pessoa falou") — não dispara nada, só registro (RF02).
     await prisma.message.create({ data: { contactId: contact.id, direction: "inbound", content: event.text } });
@@ -78,6 +71,26 @@ export async function resolveEvent(event: InstagramEvent): Promise<void> {
   }
 
   await advanceFlowRun(run.id, { capturedText: event.text });
+}
+
+// RF02 — trigger de comentário: com palavra-chave, dispara se o comentário
+// CONTIVER a palavra (não precisa ser idêntico); sem palavra-chave, dispara
+// em qualquer comentário do post. Se houver os dois tipos configurados pro
+// mesmo post, a palavra-chave específica tem prioridade sobre o "qualquer".
+async function findCommentTrigger(
+  postId: string,
+  text: string,
+): Promise<{ id: string; flowId: string } | null> {
+  const candidates = await prisma.postTrigger.findMany({
+    where: { type: "comment", postId, active: true },
+  });
+
+  const byKeyword = candidates.find(
+    (t) => t.keyword && text.toLowerCase().includes(t.keyword.toLowerCase()),
+  );
+  if (byKeyword) return byKeyword;
+
+  return candidates.find((t) => !t.keyword) ?? null;
 }
 
 // RF (novo) — trigger de "DM com palavra-chave": dispara um flow pra quem manda
