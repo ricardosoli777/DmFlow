@@ -1,7 +1,13 @@
 import type { Contact, FlowRun } from "@dmflow/db";
 import { getPrisma } from "@dmflow/db";
 import type { ButtonAction } from "../services/instagram";
-import { sendButtonsMessage, sendDirectMessage, sendMediaMessage, sendPrivateReply } from "../services/instagram";
+import {
+  interpolate,
+  sendButtonsMessage,
+  sendDirectMessage,
+  sendMediaMessage,
+  sendPrivateReply,
+} from "../services/instagram";
 
 const prisma = getPrisma();
 
@@ -58,7 +64,7 @@ export const nodeHandlers: Record<FlowNode["type"], (args: HandlerArgs) => Promi
   // node "Botões" dedicado, só que embutido.
   message: async ({ node, contact, privateReply }) => {
     const actions = toButtonActions(node.options);
-    await sendText(contact, String(node.text ?? ""), actions, privateReply);
+    await sendText(contact, interpolate(String(node.text ?? ""), contact), actions, privateReply);
     return hasPostback(actions)
       ? { nextNodeId: null, waitingForInput: true }
       : { nextNodeId: (node.next as string) ?? null, waitingForInput: false };
@@ -71,7 +77,7 @@ export const nodeHandlers: Record<FlowNode["type"], (args: HandlerArgs) => Promi
   // o fluxo com um node "Mensagem" de texto puro quando o trigger for comentário.
   buttons: async ({ node, contact }) => {
     const actions = toButtonActions(node.options);
-    await sendButtonsMessage(contact.igsid, String(node.text ?? ""), actions);
+    await sendButtonsMessage(contact.igsid, interpolate(String(node.text ?? ""), contact), actions);
     // Se algum botão for postback, o próximo node é resolvido via clique
     // (ver resolve-event.ts). Se só houver botões de link externo, segue
     // direto pro `next` do node, já que nenhum clique volta pro webhook.
@@ -120,7 +126,7 @@ export const nodeHandlers: Record<FlowNode["type"], (args: HandlerArgs) => Promi
 
   capture: async ({ node, contact, resumeInput, privateReply }) => {
     if (resumeInput === undefined) {
-      await sendText(contact, String(node.prompt ?? ""), [], privateReply);
+      await sendText(contact, interpolate(String(node.prompt ?? ""), contact), [], privateReply);
       return { nextNodeId: null, waitingForInput: true };
     }
 

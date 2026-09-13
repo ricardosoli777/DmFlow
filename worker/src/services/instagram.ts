@@ -22,6 +22,15 @@ export type ButtonAction =
 
 type QuickReply = ButtonAction;
 
+// Personalização simples nas mensagens — {{name}}/{{username}} viram o nome
+// do contato (ou "" se não tiver). Mesma ideia do ManyChat, sem exigir editor
+// visual de variável: quem escreve o texto do node só digita `{{name}}`.
+export function interpolate(text: string, contact: { name: string | null; username: string | null }): string {
+  return text
+    .replace(/\{\{\s*name\s*\}\}/gi, contact.name ?? contact.username ?? "")
+    .replace(/\{\{\s*username\s*\}\}/gi, contact.username ?? "");
+}
+
 function toGraphButton(action: ButtonAction): Record<string, string> {
   return action.type === "url"
     ? { type: "web_url", title: action.title.slice(0, 20), url: action.url }
