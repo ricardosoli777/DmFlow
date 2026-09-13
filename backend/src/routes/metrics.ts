@@ -59,9 +59,15 @@ export async function metricsRoutes(app: FastifyInstance) {
   // -> fila -> worker -> Meta estão todos operando (pedido recorrente: "nunca
   // sei se os triggers estão funcionando").
   app.get("/metrics/health", async () => {
+    const recentSince = new Date(Date.now() - 10 * 60_000); // últimos 10min
+
     const [lastEvent, pendingEvents, jobCounts, settings] = await Promise.all([
       prisma.rawEvent.findFirst({ orderBy: { createdAt: "desc" } }),
-      prisma.rawEvent.count({ where: { processed: false } }),
+      // só conta evento parado se for RECENTE — um evento antigo que falhou
+      // de vez (ex: janela de 24h fechada) fica marcado como processado pelo
+      // worker mesmo em erro, então não deveria travar esse contador; isso
+      // aqui é defesa extra caso algo fique preso por outro motivo.
+      prisma.rawEvent.count({ where: { processed: false, createdAt: { lt: recentSince } } }),
       instagramEventsQueue.getJobCounts("waiting", "active", "failed", "completed"),
       getMetaSettings(),
     ]);
@@ -72,13 +78,11 @@ export async function metricsRoutes(app: FastifyInstance) {
       settings.graphApiVersion,
     );
 
-    const lastEventAgeMs = lastEvent ? Date.now() - lastEvent.createdAt.getTime() : null;
-
     return {
       lastEventAt: lastEvent?.createdAt ?? null,
       lastEventProcessed: lastEvent?.processed ?? null,
-      // fila travada é sinal de worker parado — evento chega mas nunca é processado
-      workerLikelyDown: pendingEvents > 0 && lastEventAgeMs !== null && lastEventAgeMs > 60_000,
+      // fila travada há mais de 10min é sinal de worker parado
+      workerLikelyDown: pendingEvents > 0,
       pendingEvents,
       queue: jobCounts,
       meta: metaStatus,

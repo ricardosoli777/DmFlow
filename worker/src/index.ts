@@ -15,12 +15,18 @@ const worker = new Worker(
     const { eventId } = job.data as { eventId: string };
     const raw = await prisma.rawEvent.findUniqueOrThrow({ where: { id: eventId } });
 
-    const events = parseMetaPayload(raw.payload);
-    for (const event of events) {
-      await resolveEvent(event);
+    try {
+      const events = parseMetaPayload(raw.payload);
+      for (const event of events) {
+        await resolveEvent(event);
+      }
+    } finally {
+      // Marca como processado mesmo quando falha (ex: Meta recusa envio fora
+      // da janela de 24h) — esses erros são permanentes, reprocessar não
+      // resolve, e deixar `processed: false` pra sempre travava o indicador
+      // de saúde do dashboard achando que o worker tinha caído.
+      await prisma.rawEvent.update({ where: { id: eventId }, data: { processed: true } });
     }
-
-    await prisma.rawEvent.update({ where: { id: eventId }, data: { processed: true } });
   },
   { connection, concurrency: 5 },
 );

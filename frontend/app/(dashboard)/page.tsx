@@ -80,7 +80,7 @@ export default function OverviewPage() {
             title="Worker / fila de eventos"
             ok={health ? !health.workerLikelyDown : null}
             okText={`Fila em dia (${health?.pendingEvents ?? 0} pendente(s))`}
-            badText={`${health?.pendingEvents ?? 0} evento(s) parado(s) na fila há mais de 1min — worker pode estar fora do ar`}
+            badText={`${health?.pendingEvents ?? 0} evento(s) parado(s) na fila há mais de 10min — worker pode estar fora do ar`}
           />
           <HealthCard
             title="Último evento recebido"
