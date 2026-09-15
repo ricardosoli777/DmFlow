@@ -1,5 +1,6 @@
 import type { Prisma } from "@dmflow/db";
 import { getPrisma } from "@dmflow/db";
+import { flowResumeQueue } from "../lib/queue";
 import type { FlowNode } from "./node-handlers";
 import { nodeHandlers } from "./node-handlers";
 
@@ -18,8 +19,18 @@ type RunContext = { originCommentId?: string; pendingPrivateReply?: boolean; [ke
 export async function advanceFlowRun(flowRunId: string, options: ResumeOptions = {}): Promise<void> {
   const run = await prisma.flowRun.findUniqueOrThrow({
     where: { id: flowRunId },
-    include: { flow: true, contact: true },
+    include: { flow: true, contact: { include: { instagramAccount: true } } },
   });
+
+  // RF17 — sem conta resolvida não tem como saber com quais credenciais
+  // enviar; nunca deveria acontecer pra um flow_run criado depois desta wave
+  // (resolve-event.ts sempre associa a conta na criação do contato), mas
+  // falha alto e visível (worker.on("failed")) em vez de mandar pra
+  // Graph API nenhuma silenciosamente.
+  if (!run.contact.instagramAccount) {
+    throw new Error(`Contato ${run.contact.id} sem conta Instagram associada — não é possível enviar mensagens.`);
+  }
+  const account = run.contact.instagramAccount;
 
   const definition = run.flow.definition as unknown as { nodes: FlowNode[] };
   let currentNodeId: string | null = run.currentNode;
@@ -42,6 +53,7 @@ export async function advanceFlowRun(flowRunId: string, options: ResumeOptions =
       node,
       run,
       contact: run.contact,
+      account,
       resumeInput: isFirstIteration ? resumeInput : undefined,
       privateReply: isFirstIteration && privateReplyPending ? { commentId: context.originCommentId as string } : undefined,
     });
@@ -54,6 +66,24 @@ export async function advanceFlowRun(flowRunId: string, options: ResumeOptions =
     }
 
     isFirstIteration = false;
+
+    if (result.delayMs !== undefined) {
+      // Node "delay" real (ou rate limit — Wave 6): pausa aqui e agenda a
+      // retomada via job atrasado do BullMQ em vez de continuar o loop —
+      // "scheduled" evita colidir com o "waiting" que resolve-event.ts usa
+      // pra resumir input de usuário (ver worker/src/lib/queue.ts).
+      const resumeNodeId = result.resumeNodeId ?? result.nextNodeId;
+      if (!resumeNodeId) {
+        await prisma.flowRun.update({ where: { id: run.id }, data: { currentNode: node.id, status: "done" } });
+        return;
+      }
+      await prisma.flowRun.update({
+        where: { id: run.id },
+        data: { currentNode: resumeNodeId, status: "scheduled" },
+      });
+      await flowResumeQueue.add("resume", { flowRunId: run.id }, { delay: result.delayMs });
+      return;
+    }
 
     if (result.waitingForInput) {
       await prisma.flowRun.update({

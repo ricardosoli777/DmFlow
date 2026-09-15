@@ -178,5 +178,14 @@ durante a configuração do app se ela é solicitada.
 ## Rate limits
 
 A Graph API tem limites por app/por usuário (calculados em "Platform Rate
-Limit" pontos). Para uso próprio (1 conta, volume moderado) não deve ser
-problema, mas o flow engine deve ter retry/backoff em caso de 429.
+Limit" pontos). Especificamente pra **private replies**, a Meta documenta um
+cap de **750 envios por hora por conta conectada**.
+
+**Implementado (RNF09):** `worker/src/services/instagram.ts` (`checkSendRateLimit`)
+conta envios num contador Redis por hora, com folga de segurança em **740**
+(abaixo do limite real). Quando estoura, o node que ia enviar é reagendado
+pra tentar de novo (mesmo mecanismo do node "Aguardar" — ver
+`docs/03-motor-de-fluxos.md`) em vez de falhar ou perder a mensagem, e fica
+registrado em `messages_log` com `status: "rate_limited"`. A chave do
+contador já é particionada por conta (`igUserId`), então continua correta
+quando o app suportar múltiplas contas.

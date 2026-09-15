@@ -63,7 +63,6 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       DASHBOARD_ADMIN_EMAIL: ${DASHBOARD_ADMIN_EMAIL}
-      DASHBOARD_ADMIN_PASSWORD: ${DASHBOARD_ADMIN_PASSWORD}
     networks:
       - dmflow_internal
     deploy:
@@ -78,12 +77,10 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: redis://dmflow-redis:6379
       JWT_SECRET: ${JWT_SECRET}
-      META_APP_ID: ${META_APP_ID}
-      META_APP_SECRET: ${META_APP_SECRET}
-      META_VERIFY_TOKEN: ${META_VERIFY_TOKEN}
-      META_PAGE_ACCESS_TOKEN: ${META_PAGE_ACCESS_TOKEN}
-      META_IG_USER_ID: ${META_IG_USER_ID}
-      META_GRAPH_API_VERSION: ${META_GRAPH_API_VERSION}
+      PUBLIC_API_URL: https://hooks.arkitekt.space
+      PUBLIC_APP_URL: https://dmflow.arkitekt.space
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      EMAIL_FROM: ${EMAIL_FROM}
     networks:
       - dmflow_internal
       - Arkitekt
@@ -104,9 +101,7 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: redis://dmflow-redis:6379
-      META_PAGE_ACCESS_TOKEN: ${META_PAGE_ACCESS_TOKEN}
-      META_IG_USER_ID: ${META_IG_USER_ID}
-      META_GRAPH_API_VERSION: ${META_GRAPH_API_VERSION}
+      PUBLIC_API_URL: https://hooks.arkitekt.space
     networks:
       - dmflow_internal
     deploy:

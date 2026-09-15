@@ -7,7 +7,7 @@ export async function contactRoutes(app: FastifyInstance) {
   app.get("/contacts", async (req) => {
     const query = z.object({ tag: z.string().optional() }).parse(req.query);
     return prisma.contact.findMany({
-      where: query.tag ? { tags: { has: query.tag } } : undefined,
+      where: { workspaceId: req.workspaceId, ...(query.tag ? { tags: { has: query.tag } } : {}) },
       orderBy: { createdAt: "desc" },
       take: 100,
     });
@@ -22,7 +22,7 @@ export async function contactRoutes(app: FastifyInstance) {
         flowRuns: { orderBy: { createdAt: "desc" }, include: { flow: true, trigger: true } },
       },
     });
-    if (!contact) return reply.status(404).send({ error: "not found" });
+    if (!contact || contact.workspaceId !== req.workspaceId) return reply.status(404).send({ error: "not found" });
     return contact;
   });
 
@@ -37,7 +37,7 @@ export async function contactRoutes(app: FastifyInstance) {
       .parse(req.body);
 
     const exists = await prisma.contact.findUnique({ where: { id } });
-    if (!exists) return reply.status(404).send({ error: "not found" });
+    if (!exists || exists.workspaceId !== req.workspaceId) return reply.status(404).send({ error: "not found" });
 
     return prisma.contact.update({ where: { id }, data: body });
   });
@@ -45,7 +45,7 @@ export async function contactRoutes(app: FastifyInstance) {
   app.delete("/contacts/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
     const exists = await prisma.contact.findUnique({ where: { id } });
-    if (!exists) return reply.status(404).send({ error: "not found" });
+    if (!exists || exists.workspaceId !== req.workspaceId) return reply.status(404).send({ error: "not found" });
 
     // sem o contato, mensagens e flow_runs associados não fazem sentido — some junto
     await prisma.$transaction([

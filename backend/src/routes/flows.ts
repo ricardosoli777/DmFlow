@@ -32,28 +32,32 @@ const saveSchema = z.object({
 
 // RF04, RF10 — o grafo salvo aqui é exatamente o que o worker executa.
 export async function flowRoutes(app: FastifyInstance) {
-  app.get("/flows", async () => {
-    return prisma.flow.findMany({ orderBy: { updatedAt: "desc" } });
+  app.get("/flows", async (req) => {
+    return prisma.flow.findMany({ where: { workspaceId: req.workspaceId }, orderBy: { updatedAt: "desc" } });
   });
 
   app.get("/flows/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
     const flow = await prisma.flow.findUnique({ where: { id } });
-    if (!flow) return reply.status(404).send({ error: "not found" });
+    if (!flow || flow.workspaceId !== req.workspaceId) return reply.status(404).send({ error: "not found" });
     return flow;
   });
 
   app.post("/flows", async (req, reply) => {
     const body = saveSchema.parse(req.body);
     const flow = await prisma.flow.create({
-      data: { name: body.name, definition: body.definition as Prisma.InputJsonValue },
+      data: { workspaceId: req.workspaceId, name: body.name, definition: body.definition as Prisma.InputJsonValue },
     });
     return reply.status(201).send(flow);
   });
 
-  app.put("/flows/:id", async (req) => {
+  app.put("/flows/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
     const body = saveSchema.parse(req.body);
+
+    const existing = await prisma.flow.findUnique({ where: { id } });
+    if (!existing || existing.workspaceId !== req.workspaceId) return reply.status(404).send({ error: "not found" });
+
     return prisma.flow.update({
       where: { id },
       data: {
@@ -66,6 +70,9 @@ export async function flowRoutes(app: FastifyInstance) {
 
   app.delete("/flows/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
+
+    const existing = await prisma.flow.findUnique({ where: { id } });
+    if (!existing || existing.workspaceId !== req.workspaceId) return reply.status(404).send({ error: "not found" });
 
     const triggerCount = await prisma.postTrigger.count({ where: { flowId: id } });
     if (triggerCount > 0) {

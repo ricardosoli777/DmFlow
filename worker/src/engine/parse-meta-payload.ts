@@ -1,5 +1,17 @@
 import type { InstagramEvent } from "./resolve-event";
 
+/**
+ * RF17 — `entry[].id` é o ID (na própria Instagram) da conta que recebeu o
+ * evento — é assim que o worker descobre a qual `InstagramAccount`/workspace
+ * um evento bruto pertence, antes de qualquer outra coisa (ver
+ * worker/src/index.ts). Um único POST de webhook da Meta sempre traz
+ * entradas da MESMA conta (é o objeto assinado no webhook), então o
+ * primeiro `entry[].id` já resolve pro payload inteiro.
+ */
+export function extractAccountIgUserId(payload: unknown): string | null {
+  return (payload as any)?.entry?.[0]?.id ?? null;
+}
+
 // Traduz o payload bruto do webhook da Meta (Instagram Graph API) pro shape
 // interno do engine. Ver docs/04-integracao-meta.md pro formato oficial.
 //

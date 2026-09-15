@@ -29,20 +29,17 @@ reportar claramente "subiu tudo certo" pra quem não entende de infra.
 Todas as variáveis necessárias, comentadas em português simples:
 
 ```env
-# Credenciais do app Meta (developers.facebook.com)
-META_APP_ID=
-META_APP_SECRET=
-META_PAGE_ACCESS_TOKEN=
-META_VERIFY_TOKEN=
+# Credenciais da Meta NÃO vão aqui — cada workspace conecta suas contas
+# Instagram direto pelo dashboard, em Configurações (RF17).
 
 # Banco de dados (gerado automaticamente, não precisa mudar)
 POSTGRES_USER=dmflow
 POSTGRES_PASSWORD=troque_esta_senha
 POSTGRES_DB=dmflow
 
-# Painel (login inicial)
+# Painel (e-mail que ganha o primeiro workspace — login é por magic-link, sem senha)
 DASHBOARD_ADMIN_EMAIL=voce@exemplo.com
-DASHBOARD_ADMIN_PASSWORD=troque_esta_senha
+RESEND_API_KEY=
 ```
 
 ### 4. Script de setup guiado
@@ -113,6 +110,20 @@ não tem esse problema por rodar isolado) continua usando os nomes simples
 dentro do `infra/docker-stack.yml` (via variável de ambiente na VPS)
 precisam apontar pro nome prefixado (`@dmflow-postgres:5432`,
 `redis://dmflow-redis:6379`).
+
+## ⚠️ Primeira migration commitada (upgrade de instalação já existente)
+
+A migration `20260915120301_workspaces_backfill_default` (parte da wave que
+trouxe multi-conta/workspaces — RF16/RF17) faz uma migração de **dados**, não
+só de schema: numa instalação que já tinha usuário/contatos/flows antes dela,
+cria um workspace "Minha Automação", torna o usuário existente `OWNER` dele,
+migra a linha única `settings.instagram_connection` pra virar a primeira
+`InstagramAccount`, e move contatos/flows/triggers/links existentes pra
+dentro desse workspace. Tudo isso roda **automaticamente** no próximo
+`docker stack deploy`/`docker compose up` (é o serviço `migrate`, que já
+roda `prisma migrate deploy` antes do backend subir) — não precisa de nenhum
+comando manual. Numa instalação nova (banco vazio), essa migration não faz
+nada (não existe usuário ainda nesse ponto do boot).
 
 ## Por que isso cumpre o objetivo de "outras pessoas sem conhecimento"
 

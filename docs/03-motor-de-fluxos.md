@@ -79,17 +79,18 @@ externo) — nunca os dois ao mesmo tempo. Ver `worker/src/engine/node-handlers.
    avança pro `next` sozinho.
 5. Loga cada passo em `messages_log` pra auditoria/analytics.
 
-## Pendências conhecidas
+## Agendamento real do node "delay"
 
-- **`delay` não espera de verdade.** Hoje o node só avança pro `next`
-  imediatamente (`worker/src/engine/node-handlers.ts`) — não existe
-  agendamento real (ex: job atrasado no BullMQ). Um fluxo com `delay` de
-  "esperar 1 hora" hoje não espera nada. Fica pra quando alguém precisar de
-  verdade de um delay maior que alguns segundos.
-- **Inbox sem conversa completa.** A tela de Inbox lista contatos, mas não
-  tem uma view de thread (mensagens indo e vindo) nem envio manual real —
-  `POST /contacts/:id/messages` já existe no backend mas só grava no log,
-  ainda não chama a Instagram Messaging API de verdade.
+O node `delay` pausa o `flow_run` de verdade: o handler
+(`worker/src/engine/node-handlers.ts`) calcula `delayMs` a partir de
+`duration`/`unit`, e o executor (`executor.ts`) marca o `flow_run` como
+`status: "scheduled"` (já com `currentNode` apontando pro node seguinte) e
+agenda um job atrasado do BullMQ na fila `flow-resume`
+(`worker/src/lib/queue.ts`) em vez de continuar a execução na mesma chamada.
+Quando o job dispara, `worker/src/index.ts` volta o `status` pra `"running"`
+e chama `advanceFlowRun` de novo, retomando exatamente de onde parou. Esse
+mesmo mecanismo (`NodeResult.delayMs`/`resumeNodeId`) é reaproveitado pelo
+rate limiting de envio (ver `docs/04-integracao-meta.md`).
 
 ## Regra importante da Meta (janela de mensagens)
 

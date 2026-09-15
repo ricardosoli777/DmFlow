@@ -1,55 +1,75 @@
+import { randomUUID } from "node:crypto";
+import type { InstagramAccount } from "@prisma/client";
 import { getPrisma } from "./index";
 
-export type MetaSettings = {
-  appId: string;
-  appSecret: string;
-  verifyToken: string;
-  pageAccessToken: string;
-  igUserId: string;
-  igUsername: string;
-  graphApiVersion: string;
+const CACHE_TTL_MS = 15_000;
+const cacheById = new Map<string, { value: InstagramAccount; expiresAt: number }>();
+
+export type InstagramAccountInput = {
+  appId?: string;
+  appSecret?: string;
+  verifyToken?: string;
+  pageAccessToken?: string;
+  igUserId?: string;
+  igUsername?: string;
+  graphApiVersion?: string;
 };
 
-const SETTING_KEY = "instagram_connection";
-const CACHE_TTL_MS = 15_000;
-
-let cache: { value: MetaSettings; expiresAt: number } | null = null;
-
-// Lê a conexão salva no banco (editável pelo dashboard); cai pro .env se
-// nunca foi configurada por lá. Cacheado por 15s pra não bater no banco em
-// todo evento de webhook.
-export async function getMetaSettings(): Promise<MetaSettings> {
-  if (cache && cache.expiresAt > Date.now()) return cache.value;
+/**
+ * RF17 — substitui a antiga `getMetaSettings()` (linha única global). Cada
+ * conta é lida pelo próprio `id` (workspace-scoped na camada de rotas —
+ * ver backend/src/routes/settings.ts), cacheada por 15s pra não bater no
+ * banco em todo evento de webhook/envio.
+ */
+export async function getInstagramAccount(id: string): Promise<InstagramAccount | null> {
+  const cached = cacheById.get(id);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
 
   const prisma = getPrisma();
-  const row = await prisma.setting.findUnique({ where: { key: SETTING_KEY } });
-  const stored = (row?.value as Partial<MetaSettings>) ?? {};
-
-  const value: MetaSettings = {
-    appId: stored.appId || process.env.META_APP_ID || "",
-    appSecret: stored.appSecret || process.env.META_APP_SECRET || "",
-    verifyToken: stored.verifyToken || process.env.META_VERIFY_TOKEN || "",
-    pageAccessToken: stored.pageAccessToken || process.env.META_PAGE_ACCESS_TOKEN || "",
-    igUserId: stored.igUserId || process.env.META_IG_USER_ID || "",
-    igUsername: stored.igUsername || "",
-    graphApiVersion: stored.graphApiVersion || process.env.META_GRAPH_API_VERSION || "v21.0",
-  };
-
-  cache = { value, expiresAt: Date.now() + CACHE_TTL_MS };
-  return value;
+  const account = await prisma.instagramAccount.findUnique({ where: { id } });
+  if (account) cacheById.set(id, { value: account, expiresAt: Date.now() + CACHE_TTL_MS });
+  return account;
 }
 
-export async function saveMetaSettings(partial: Partial<MetaSettings>): Promise<MetaSettings> {
+/**
+ * Usado só na entrada do pipeline (worker/src/index.ts): descobre a qual
+ * conta/workspace um evento de webhook pertence, a partir do `entry[].id`
+ * do payload (ID da conta na própria Instagram) — é o único jeito de saber
+ * o workspace antes de qualquer outro dado.
+ */
+export async function getInstagramAccountByIgUserId(igUserId: string): Promise<InstagramAccount | null> {
   const prisma = getPrisma();
-  const current = await getMetaSettings();
-  const merged: MetaSettings = { ...current, ...partial };
+  return prisma.instagramAccount.findUnique({ where: { igUserId } });
+}
 
-  await prisma.setting.upsert({
-    where: { key: SETTING_KEY },
-    create: { key: SETTING_KEY, value: merged as unknown as object },
-    update: { value: merged as unknown as object },
-  });
+export async function listInstagramAccounts(workspaceId: string): Promise<InstagramAccount[]> {
+  const prisma = getPrisma();
+  return prisma.instagramAccount.findMany({ where: { workspaceId }, orderBy: { createdAt: "asc" } });
+}
 
-  cache = null;
-  return merged;
+/**
+ * `id: null` cria uma conta nova (rascunho — pode ainda não saber o
+ * `igUserId` de verdade, por isso o placeholder único abaixo) pra permitir
+ * salvar campo por campo como o form de Configurações já fazia antes.
+ */
+export async function saveInstagramAccount(
+  workspaceId: string,
+  id: string | null,
+  partial: InstagramAccountInput,
+): Promise<InstagramAccount> {
+  const prisma = getPrisma();
+  const account = id
+    ? await prisma.instagramAccount.update({ where: { id }, data: partial })
+    : await prisma.instagramAccount.create({
+        data: { workspaceId, ...partial, igUserId: partial.igUserId || `pending-${randomUUID()}` },
+      });
+
+  cacheById.delete(account.id);
+  return account;
+}
+
+export async function deleteInstagramAccount(id: string): Promise<void> {
+  const prisma = getPrisma();
+  await prisma.instagramAccount.delete({ where: { id } });
+  cacheById.delete(id);
 }

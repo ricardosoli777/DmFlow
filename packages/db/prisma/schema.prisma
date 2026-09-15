@@ -8,63 +8,173 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum WorkspaceInvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+}
+
+// RF16 — usuário sem senha: login é sempre por magic-link (RNF10). Pode
+// pertencer a vários workspaces (WorkspaceMember).
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String
-  createdAt    DateTime @default(now())
+  id          String            @id @default(uuid())
+  email       String            @unique
+  createdAt   DateTime          @default(now())
+  memberships WorkspaceMember[]
 
   @@map("users")
 }
 
+// RF16 — cada workspace é um espaço isolado (contatos/flows/triggers/links
+// próprios); RF17 — pode ter várias contas Instagram conectadas.
+model Workspace {
+  id                String                @id @default(uuid())
+  name              String
+  createdAt         DateTime              @default(now())
+  members           WorkspaceMember[]
+  invitations       WorkspaceInvitation[]
+  instagramAccounts InstagramAccount[]
+  contacts          Contact[]
+  flows             Flow[]
+  triggers          PostTrigger[]
+  rawEvents         RawEvent[]
+  trackedLinks      TrackedLink[]
+
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String        @id @default(uuid())
+  workspaceId String
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id])
+  userId      String
+  user        User          @relation(fields: [userId], references: [id])
+  role        WorkspaceRole @default(MEMBER)
+  createdAt   DateTime      @default(now())
+
+  @@unique([workspaceId, userId])
+  @@map("workspace_members")
+}
+
+// Convite por link — quem recebe o link e faz login com o e-mail convidado
+// vira membro automaticamente (ver backend/src/routes/auth.ts).
+model WorkspaceInvitation {
+  id          String                    @id @default(uuid())
+  workspaceId String
+  workspace   Workspace                 @relation(fields: [workspaceId], references: [id])
+  email       String
+  role        WorkspaceRole             @default(MEMBER)
+  token       String                    @unique
+  status      WorkspaceInvitationStatus @default(PENDING)
+  createdAt   DateTime                  @default(now())
+  expiresAt   DateTime
+
+  @@map("workspace_invitations")
+}
+
+// RNF10 — token de uso único pro link de login (e-mail). Curto prazo de
+// validade, marcado como usado depois do primeiro clique.
+model MagicLinkToken {
+  id        String    @id @default(uuid())
+  email     String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@map("magic_link_tokens")
+}
+
+// RF17 — substitui a antiga linha única `Setting("instagram_connection")`:
+// agora um workspace pode ter várias contas conectadas. `igUserId` é único
+// globalmente (é o ID da conta na própria Instagram) — é por ele que um
+// evento de webhook recebido descobre a que conta/workspace pertence, antes
+// de saber o workspace (ver worker/src/index.ts).
+model InstagramAccount {
+  id              String    @id @default(uuid())
+  workspaceId     String
+  workspace       Workspace @relation(fields: [workspaceId], references: [id])
+  appId           String    @default("")
+  appSecret       String    @default("")
+  verifyToken     String    @default("")
+  pageAccessToken String    @default("")
+  igUserId        String    @unique
+  igUsername      String    @default("")
+  graphApiVersion String    @default("v21.0")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  contacts        Contact[]
+
+  @@map("instagram_accounts")
+}
+
 model Contact {
-  id            String     @id @default(uuid())
-  igsid         String     @unique
-  name          String?
-  username      String?
-  avatarUrl     String?
-  tags          String[]   @default([])
-  attributes    Json       @default("{}")
+  id                 String            @id @default(uuid())
+  workspaceId        String
+  workspace          Workspace         @relation(fields: [workspaceId], references: [id])
+  // Conta específica por onde esse contato chegou — nulo só em dado legado
+  // migrado antes do app suportar múltiplas contas (RF17).
+  instagramAccountId String?
+  instagramAccount   InstagramAccount? @relation(fields: [instagramAccountId], references: [id])
+  igsid              String
+  name               String?
+  username           String?
+  avatarUrl          String?
+  tags               String[]          @default([])
+  attributes         Json              @default("{}")
   // RNF01: última interação iniciada pelo usuário (comentário ou DM) —
   // usada pra checar a janela de 24h da Instagram Messaging API.
-  lastInboundAt DateTime?
-  createdAt     DateTime   @default(now())
-  flowRuns      FlowRun[]
-  messages      Message[]
+  lastInboundAt      DateTime?
+  createdAt          DateTime          @default(now())
+  flowRuns           FlowRun[]
+  messages           Message[]
 
+  // igsid é único por Instagram Business (não globalmente) — a mesma pessoa
+  // real pode comentar em contas de workspaces diferentes.
+  @@unique([workspaceId, igsid])
   @@map("contacts")
 }
 
 model Flow {
-  id         String       @id @default(uuid())
-  name       String
-  definition Json
-  version    Int          @default(1)
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
-  triggers   PostTrigger[]
-  runs       FlowRun[]
+  id          String        @id @default(uuid())
+  workspaceId String
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id])
+  name        String
+  definition  Json
+  version     Int           @default(1)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  triggers    PostTrigger[]
+  runs        FlowRun[]
 
   @@map("flows")
 }
 
 model PostTrigger {
-  id        String   @id @default(uuid())
+  id              String    @id @default(uuid())
+  workspaceId     String
+  workspace       Workspace @relation(fields: [workspaceId], references: [id])
   // "comment" (comentário em post/reel, exige postId) | "dm_keyword" (DM direta
   // com palavra-chave, sem post associado)
-  type      String   @default("comment")
-  postId    String?
-  keyword   String?
+  type            String    @default("comment")
+  postId          String?
+  keyword         String?
   // Resposta pública opcional no próprio comentário (só faz sentido pra
   // type: "comment") — sai antes da DM/Private Reply, tipo "growth tool" do
   // ManyChat: prova social pública + a automação continua em privado.
   publicReplyText String?
-  active    Boolean  @default(true)
-  flowId    String
-  flow      Flow     @relation(fields: [flowId], references: [id])
-  hitCount  Int      @default(0)
-  createdAt DateTime @default(now())
-  flowRuns  FlowRun[]
+  active          Boolean   @default(true)
+  flowId          String
+  flow            Flow      @relation(fields: [flowId], references: [id])
+  hitCount        Int       @default(0)
+  createdAt       DateTime  @default(now())
+  flowRuns        FlowRun[]
 
   @@map("posts_triggers")
 }
@@ -79,7 +189,7 @@ model FlowRun {
   triggerId   String?
   trigger     PostTrigger? @relation(fields: [triggerId], references: [id])
   currentNode String
-  status      String       @default("running") // running | waiting | done | error
+  status      String       @default("running") // running | waiting | scheduled | done | error
   context     Json         @default("{}")
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
@@ -91,29 +201,52 @@ model Message {
   id        String   @id @default(uuid())
   contactId String
   contact   Contact  @relation(fields: [contactId], references: [id])
-  direction String   // inbound | outbound | blocked (RNF01: fora da janela de 24h)
+  direction String // inbound | outbound | blocked (RNF01: fora da janela de 24h)
   content   String
+  // RNF08: motivo estruturado do envio — permite diagnosticar falha/skip sem
+  // ler log bruto. "ok" cobre o caminho feliz (envio ou inbound normais).
+  status    String   @default("ok") // ok | skipped | failed | rate_limited | follow_gate_pending
+  reason    String?
   createdAt DateTime @default(now())
 
   @@map("messages_log")
 }
 
 model RawEvent {
-  id        String   @id @default(uuid())
-  payload   Json
-  processed Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id          String     @id @default(uuid())
+  // Workspace resolvido a partir do `entry[].id` do payload (ID da conta
+  // Instagram que recebeu o evento) — nulo só se nenhuma conta conectada
+  // bater com o payload (ex: evento de uma conta desconectada/removida).
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
+  payload     Json
+  processed   Boolean    @default(false)
+  createdAt   DateTime   @default(now())
 
   @@map("events_raw")
 }
 
-// Config editável pelo dashboard (ex: conexão com a conta Instagram) — dá
-// pra trocar de conta sem mexer no .env/redeploy. Backend/worker leem daqui
-// com fallback pras variáveis de ambiente (ver packages/db/src/settings.ts).
-model Setting {
-  key       String   @id
-  value     Json
-  updatedAt DateTime @updatedAt
+// RF14 — link rastreado: em vez de colar a URL final direto num botão, o
+// fluxo aponta pro redirect público `GET /r/:code` (backend/src/routes/tracked-links.ts),
+// que loga o clique e manda pro destino de verdade. Dá CTR por campanha.
+model TrackedLink {
+  id             String      @id @default(uuid())
+  workspaceId    String
+  workspace      Workspace   @relation(fields: [workspaceId], references: [id])
+  label          String
+  destinationUrl String
+  code           String      @unique
+  clicks         LinkClick[]
+  createdAt      DateTime    @default(now())
 
-  @@map("settings")
+  @@map("tracked_links")
+}
+
+model LinkClick {
+  id            String      @id @default(uuid())
+  trackedLinkId String
+  trackedLink   TrackedLink @relation(fields: [trackedLinkId], references: [id])
+  clickedAt     DateTime    @default(now())
+
+  @@map("link_clicks")
 }

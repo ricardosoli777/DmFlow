@@ -2,15 +2,19 @@ import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import Fastify from "fastify";
 import { env } from "./env";
+import { requireAuth } from "./lib/auth";
 import { authRoutes } from "./routes/auth";
 import { contactRoutes } from "./routes/contacts";
 import { flowRoutes } from "./routes/flows";
+import { instagramAccountRoutes } from "./routes/instagram-accounts";
 import { instagramMediaRoutes } from "./routes/instagram-media";
+import { linkRedirectRoutes } from "./routes/link-redirect";
 import { messageRoutes } from "./routes/messages";
 import { metricsRoutes } from "./routes/metrics";
-import { settingsRoutes } from "./routes/settings";
+import { trackedLinkRoutes } from "./routes/tracked-links";
 import { triggerRoutes } from "./routes/triggers";
 import { webhookRoutes } from "./routes/webhooks";
+import { workspaceRoutes } from "./routes/workspace";
 
 const app = Fastify({ logger: true });
 
@@ -30,15 +34,28 @@ async function bootstrap() {
 
   app.get("/health", async () => ({ status: "ok" }));
 
+  // Público — sem JWT nem workspace: é a Meta chamando (webhooks), o link
+  // que sai numa DM (redirect), ou o próprio login (auth).
   await app.register(webhookRoutes);
   await app.register(authRoutes);
-  await app.register(triggerRoutes);
-  await app.register(flowRoutes);
-  await app.register(contactRoutes);
-  await app.register(messageRoutes);
-  await app.register(metricsRoutes);
-  await app.register(settingsRoutes);
-  await app.register(instagramMediaRoutes);
+  await app.register(linkRedirectRoutes);
+
+  // RF16/RNF10 — tudo daqui pra baixo exige JWT válido + membership no
+  // workspace informado em X-Workspace-Id (achado: antes desta wave NENHUMA
+  // rota validava o token — ver backend/src/lib/auth.ts).
+  await app.register(async (protectedApp) => {
+    protectedApp.addHook("preHandler", requireAuth);
+
+    await protectedApp.register(workspaceRoutes);
+    await protectedApp.register(triggerRoutes);
+    await protectedApp.register(flowRoutes);
+    await protectedApp.register(contactRoutes);
+    await protectedApp.register(messageRoutes);
+    await protectedApp.register(metricsRoutes);
+    await protectedApp.register(instagramAccountRoutes);
+    await protectedApp.register(instagramMediaRoutes);
+    await protectedApp.register(trackedLinkRoutes);
+  });
 
   await app.listen({ port: env.PORT, host: "0.0.0.0" });
 }

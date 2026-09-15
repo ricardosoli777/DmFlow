@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, FlaskConical, Pause, Play, RefreshCw, Trash2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,8 @@ type IgMedia = {
   timestamp: string;
 };
 
+type InstagramAccountOption = { id: string; igUsername: string; connected: boolean };
+
 export default function TriggersPage() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
@@ -53,6 +55,7 @@ export default function TriggersPage() {
   const publicReplyRef = useRef<HTMLInputElement>(null);
   const [flowId, setFlowId] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [accountId, setAccountId] = useState("");
 
   const { data: triggers } = useQuery({
     queryKey: ["triggers"],
@@ -127,8 +130,19 @@ export default function TriggersPage() {
     queryFn: () => api.get<Flow[]>("/flows"),
   });
 
-  // RF: busca os posts/reels reais da conta conectada — atualiza sempre que
-  // a aba de criação abre, pra sempre puxar o conteúdo mais recente.
+  // RF17 — workspace pode ter mais de uma conta Instagram conectada; escolhe
+  // qual delas navegar pra pegar o postId do trigger.
+  const { data: accounts } = useQuery({
+    queryKey: ["instagram-accounts"],
+    queryFn: () => api.get<InstagramAccountOption[]>("/instagram-accounts"),
+  });
+
+  useEffect(() => {
+    if (!accountId && accounts?.length) setAccountId(accounts[0].id);
+  }, [accounts, accountId]);
+
+  // RF: busca os posts/reels reais da conta escolhida — atualiza sempre que
+  // a aba de criação abre ou a conta muda, pra sempre puxar o conteúdo mais recente.
   const {
     data: mediaData,
     isLoading: loadingMedia,
@@ -136,9 +150,9 @@ export default function TriggersPage() {
     refetch: refetchMedia,
     isFetching: refreshingMedia,
   } = useQuery({
-    queryKey: ["instagram-media"],
-    queryFn: () => api.get<{ media: IgMedia[] }>("/instagram/media"),
-    enabled: showForm && type === "comment",
+    queryKey: ["instagram-media", accountId],
+    queryFn: () => api.get<{ media: IgMedia[] }>(`/instagram/media?accountId=${accountId}`),
+    enabled: showForm && type === "comment" && Boolean(accountId),
   });
 
   const create = useMutation({
@@ -225,6 +239,34 @@ export default function TriggersPage() {
                     Atualizar
                   </Button>
                 </div>
+
+                {(accounts?.length ?? 0) > 1 && (
+                  <label className="flex flex-col gap-1 text-xs">
+                    Conta Instagram
+                    <select
+                      className="rounded-[var(--radius)] border border-border bg-background p-1.5 text-sm outline-none focus:ring-2 focus:ring-primary"
+                      value={accountId}
+                      onChange={(e) => {
+                        setAccountId(e.target.value);
+                        setPostId("");
+                      }}
+                    >
+                      {accounts!.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.igUsername ? `@${a.igUsername}` : "Conta sem username salvo"}
+                          {!a.connected ? " (desconectada)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+
+                {!accounts?.length && (
+                  <p className="text-sm text-danger">
+                    Nenhuma conta Instagram conectada — configure em Configurações antes de criar um trigger de
+                    comentário.
+                  </p>
+                )}
 
                 {loadingMedia && <p className="text-sm text-muted-foreground">Buscando posts e reels...</p>}
 

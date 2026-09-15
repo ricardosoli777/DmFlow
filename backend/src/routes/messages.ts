@@ -1,18 +1,21 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
+import { manualSendQueue } from "../lib/queue";
 
-// RF11 — intervenção manual na inbox (envio direto, fora do flow automático)
+// RF11 — intervenção manual na inbox (envio direto, fora do flow automático).
+// Nunca envia síncrono (RNF02): só enfileira, o worker chama a Instagram
+// Messaging API de verdade e grava o messages_log (com status/reason —
+// RNF08) via worker/src/services/instagram.ts.
 export async function messageRoutes(app: FastifyInstance) {
   app.post("/contacts/:id/messages", async (req, reply) => {
     const { id } = req.params as { id: string };
     const body = z.object({ content: z.string().min(1) }).parse(req.body);
 
-    // TODO (Wave 2): chamar o serviço de envio real via Instagram Messaging API
-    const message = await prisma.message.create({
-      data: { contactId: id, direction: "outbound", content: body.content },
-    });
+    const contact = await prisma.contact.findUnique({ where: { id } });
+    if (!contact || contact.workspaceId !== req.workspaceId) return reply.status(404).send({ error: "not found" });
 
-    return reply.status(201).send(message);
+    await manualSendQueue.add("send", { contactId: id, text: body.content });
+    return reply.status(202).send({ queued: true });
   });
 }

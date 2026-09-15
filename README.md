@@ -42,17 +42,31 @@ visualmente no dashboard, sem escrever código.
    - **Mac/Linux:** abra o terminal na pasta e rode `./setup.sh`
 4. Na primeira vez, ele vai criar um arquivo `.env` e parar, pedindo pra
    você preencher. Abra o `.env` num editor de texto simples (Bloco de
-   Notas serve) e troque só o e-mail/senha do login do dashboard
-   (`DASHBOARD_ADMIN_EMAIL`/`DASHBOARD_ADMIN_PASSWORD`) e as senhas
-   genéricas de banco/fila (`troque_esta_senha...`) por valores seus —
-   **não precisa preencher nenhuma credencial da Meta aqui**, isso é feito
-   depois, dentro do próprio app.
+   Notas serve) e troque o e-mail do dashboard (`DASHBOARD_ADMIN_EMAIL`) e
+   as senhas genéricas de banco/fila (`troque_esta_senha...`) por valores
+   seus — **não precisa preencher nenhuma credencial da Meta aqui**, isso é
+   feito depois, dentro do próprio app. Login não usa senha (é por link de
+   e-mail — ver [`RESEND_API_KEY`](#-login-por-e-mail-sem-senha) abaixo).
 5. Rode o script de novo. Ele vai baixar as imagens prontas e subir tudo.
-6. Acesse **http://localhost:3000**, faça login com o e-mail/senha que você
-   definiu no `.env` e vá em **Configurações** (`/settings`) pra colar as
-   credenciais da sua conta Meta/Instagram (veja onde pegar cada uma logo
-   abaixo). Elas ficam guardadas no banco de dados do próprio app — cada
-   pessoa que for rodar o DMFlow usa as suas, sem editar arquivo nenhum.
+6. Acesse **http://localhost:3000**, digite o e-mail que você colocou em
+   `DASHBOARD_ADMIN_EMAIL` — sem `RESEND_API_KEY` configurada, o link de
+   login aparece no log do container `backend` (`docker compose logs -f
+   backend`) em vez de chegar por e-mail de verdade. Depois de entrar, vá em
+   **Configurações** (`/settings`) pra colar as credenciais da sua conta
+   Meta/Instagram (veja onde pegar cada uma logo abaixo). Elas ficam
+   guardadas no banco de dados do próprio app — cada pessoa que for rodar o
+   DMFlow usa as suas, sem editar arquivo nenhum.
+
+### 🔑 Login por e-mail (sem senha)
+
+O DMFlow não usa senha — o login é sempre um link de uso único mandado por
+e-mail (expira em 15 minutos). Pra receber esse e-mail de verdade (em vez de
+só aparecer no log do backend), crie uma conta grátis em
+[resend.com](https://resend.com), gere uma API key e preencha
+`RESEND_API_KEY`/`EMAIL_FROM` no `.env`. Suporta múltiplas pessoas: quem tem
+acesso ao workspace pode convidar outras em **Time** (`/settings/team`) —
+cada convite vira um link pra copiar e mandar, sem precisar configurar nada
+a mais.
 
 Isso sobe: banco de dados, fila, armazenamento de arquivos, API, worker
 (motor de automação) e o dashboard — tudo junto, isolado, sem precisar
@@ -195,12 +209,21 @@ DMFlow/
     dashboard (com passo a passo em cada campo), guardadas no banco —
     não usa mais `.env` pra isso
   - `/triggers` — formulário real de criação (post + palavra-chave + fluxo)
-  - Pendente: agendamento real do node "Aguardar" (fila com atraso), upload
-    de mídia por arrastar-e-soltar (hoje é só URL), edição de texto inline
-    no canvas
+  - Pendente: upload de mídia por arrastar-e-soltar (hoje é só URL), edição
+    de texto inline no canvas
 - ✅ **Wave 6 — no ar em produção:** https://dmflow.example.com
   (dashboard) e https://hooks.example.com (API/webhook), rodando via
   Docker Swarm numa VPS própria
+- ✅ **Wave 7 — hardening e recursos avançados** (RF13-RF15, RNF08-RNF09):
+  filtro de auto-comentário, `messages_log` com status/motivo estruturado,
+  Inbox com envio manual de verdade (thread completa em `/inbox`), node
+  "Aguardar" com agendamento real (fila `flow-resume`), rate limiting contra
+  o cap de 750 envios/h da Meta, links rastreados com CTR (`/links`), e
+  follow gate opcional em botão de CTA
+- ✅ **Wave 8 — multi-tenant** (RF16, RF17, RNF10): workspaces com papéis
+  (owner/admin/member) e convite por link (`/settings/team`), múltiplas
+  contas Instagram por workspace (`/settings`), login sem senha por
+  magic-link
 
 Ver [`docs/07-plano-waves-spec-driven.md`](docs/07-plano-waves-spec-driven.md)
 pro estado detalhado de cada etapa.

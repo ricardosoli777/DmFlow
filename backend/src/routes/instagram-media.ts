@@ -1,5 +1,7 @@
-import { getMetaSettings } from "@dmflow/db";
+import { getInstagramAccount } from "@dmflow/db";
 import type { FastifyInstance } from "fastify";
+import { z } from "zod";
+import { prisma } from "../lib/prisma";
 
 type IgMedia = {
   id: string;
@@ -12,17 +14,25 @@ type IgMedia = {
 };
 
 // RF: lista os posts/reels reais da conta conectada, pra escolher visualmente
-// ao criar um trigger (em vez de colar link/ID manualmente).
+// ao criar um trigger (em vez de colar link/ID manualmente). RF17: precisa
+// dizer de qual conta conectada (um workspace pode ter várias).
 export async function instagramMediaRoutes(app: FastifyInstance) {
   app.get("/instagram/media", async (req, reply) => {
-    const settings = await getMetaSettings();
+    const query = z.object({ accountId: z.string().optional() }).parse(req.query);
 
-    if (!settings.pageAccessToken || !settings.igUserId) {
+    const account = query.accountId
+      ? await getInstagramAccount(query.accountId)
+      : await prisma.instagramAccount.findFirst({ where: { workspaceId: req.workspaceId } });
+
+    if (!account || account.workspaceId !== req.workspaceId) {
+      return reply.status(400).send({ error: "Instagram não conectado — configure em Configurações" });
+    }
+    if (!account.pageAccessToken || !account.igUserId) {
       return reply.status(400).send({ error: "Instagram não conectado — configure em Configurações" });
     }
 
     const fields = "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp";
-    const url = `https://graph.instagram.com/${settings.graphApiVersion}/${settings.igUserId}/media?fields=${fields}&limit=50&access_token=${settings.pageAccessToken}`;
+    const url = `https://graph.instagram.com/${account.graphApiVersion}/${account.igUserId}/media?fields=${fields}&limit=50&access_token=${account.pageAccessToken}`;
 
     const res = await fetch(url);
     const data = (await res.json()) as { data?: IgMedia[]; error?: { message?: string } };

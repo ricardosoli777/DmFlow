@@ -14,13 +14,15 @@ type Overview = {
   messagesSent: number;
 };
 
+type AccountStatus = { id: string; igUsername: string; connected: boolean; username?: string; error?: string };
+
 type Health = {
   lastEventAt: string | null;
   lastEventProcessed: boolean | null;
   workerLikelyDown: boolean;
   pendingEvents: number;
   queue: { waiting?: number; active?: number; failed?: number; completed?: number };
-  meta: { connected: boolean; username?: string; error?: string };
+  accounts: AccountStatus[];
 };
 
 type RecentContact = {
@@ -70,12 +72,23 @@ export default function OverviewPage() {
       <div className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">Saúde do app</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <HealthCard
-            title="Conexão com a Meta"
-            ok={health?.meta.connected ?? null}
-            okText={health?.meta.username ? `Conectado como @${health.meta.username}` : "Conectado"}
-            badText={health?.meta.error ?? "Sem resposta da Graph API"}
-          />
+          {(health?.accounts ?? []).map((a) => (
+            <HealthCard
+              key={a.id}
+              title={a.igUsername ? `Conexão — @${a.igUsername}` : "Conexão com o Instagram"}
+              ok={a.connected}
+              okText={a.username ? `Conectado como @${a.username}` : "Conectado"}
+              badText={a.error ?? "Sem resposta da Graph API"}
+            />
+          ))}
+          {health && health.accounts.length === 0 && (
+            <HealthCard
+              title="Conexão com o Instagram"
+              ok={false}
+              okText=""
+              badText="Nenhuma conta conectada — configure em Configurações"
+            />
+          )}
           <HealthCard
             title="Worker / fila de eventos"
             ok={health ? !health.workerLikelyDown : null}

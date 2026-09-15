@@ -52,7 +52,7 @@ Tabelas principais (rascunho):
 ### 5. API (backend)
 - CRUD de flows, triggers, contatos, tags.
 - Endpoints de métricas.
-- Autenticação simples (é uso próprio — login único ou API key).
+- Autenticação por magic-link (sem senha), workspaces com papéis (owner/admin/member) — ver `docs/07`.
 
 ### 6. Dashboard (frontend)
 - SPA (React/Next.js) consumindo a API.

@@ -3,9 +3,9 @@ import { z } from "zod";
 const schema = z.object({
   DATABASE_URL: z.string(),
   REDIS_URL: z.string().default("redis://redis:6379"),
-  META_PAGE_ACCESS_TOKEN: z.string().default(""),
-  META_IG_USER_ID: z.string().default(""),
-  META_GRAPH_API_VERSION: z.string().default("v21.0"),
+  // RF14 — mesmo backend que serve `GET /r/:code` (ver backend/src/env.ts);
+  // usada só pra montar a URL de link rastreado num botão de node.
+  PUBLIC_API_URL: z.string().default("http://localhost:4000"),
 });
 
 export const env = schema.parse(process.env);

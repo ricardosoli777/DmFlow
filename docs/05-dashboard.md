@@ -31,6 +31,10 @@
 - DMs enviados / taxa de resposta.
 - Funil de conclusão do flow (quantos chegaram em cada node → drop-off).
 
+### 6. Links rastreados (RF14)
+- Lista de links criados (nome, URL de destino, link rastreado `/r/:code`, contagem de cliques).
+- Qualquer botão de link (nodes Mensagem/Botões/Imagem/Áudio/Vídeo) pode apontar pra um link rastreado em vez de colar a URL final direto.
+
 ## Stack sugerida
 
 - Next.js (React) + TypeScript

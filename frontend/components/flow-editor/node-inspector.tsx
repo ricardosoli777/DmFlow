@@ -1,12 +1,15 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
 import { useRef } from "react";
+import { api } from "@/lib/api";
 import { useFlowEditorStore } from "@/stores/flow-editor.store";
 import { Button } from "@/components/ui/button";
 import { BUILTIN_VARIABLES, VariablePicker } from "@/components/ui/variable-picker";
 
-type ButtonOption = { label: string; next?: string; url?: string };
+type ButtonOption = { label: string; next?: string; url?: string; trackedLinkId?: string; followGate?: boolean };
+type TrackedLink = { id: string; label: string };
 
 const selectClass =
   "rounded-[var(--radius)] border border-border bg-background p-2 text-sm outline-none focus:ring-2 focus:ring-primary";
@@ -18,6 +21,11 @@ export function NodeInspector() {
   const node = nodes.find((n) => n.id === selectedNodeId);
   const textRef = useRef<HTMLTextAreaElement>(null);
   const promptRef = useRef<HTMLTextAreaElement>(null);
+
+  const { data: trackedLinks } = useQuery({
+    queryKey: ["tracked-links"],
+    queryFn: () => api.get<TrackedLink[]>("/tracked-links"),
+  });
 
   // Campos capturados por nodes "Capturar resposta" no fluxo inteiro viram
   // variáveis disponíveis também (ex: {{email}} depois de um node que captura
@@ -50,10 +58,21 @@ export function NodeInspector() {
     updateNodeData(node.id, { options: [...options, { label: "", next: "" }] });
   }
 
-  function setOptionAction(index: number, action: "next" | "url") {
-    // Um botão só tem uma ação: ou vai pra outro node (postback), ou abre
-    // um link externo — trocar o tipo limpa o campo que não se aplica mais.
-    updateOption(index, action === "url" ? { next: undefined, url: "" } : { url: undefined, next: "" });
+  function setOptionAction(index: number, action: "next" | "url" | "trackedLink") {
+    // Um botão só tem uma ação: vai pra outro node (postback), abre um link
+    // externo direto, ou abre um link rastreado (RF14) — trocar o tipo limpa
+    // os campos que não se aplicam mais.
+    if (action === "url")
+      updateOption(index, { next: undefined, trackedLinkId: undefined, followGate: undefined, url: "" });
+    else if (action === "trackedLink")
+      updateOption(index, { next: undefined, url: undefined, followGate: undefined, trackedLinkId: "" });
+    else updateOption(index, { url: undefined, trackedLinkId: undefined, next: "" });
+  }
+
+  function optionActionKind(opt: ButtonOption): "next" | "url" | "trackedLink" {
+    if (opt.trackedLinkId !== undefined) return "trackedLink";
+    if (opt.url !== undefined) return "url";
+    return "next";
   }
 
   function removeOption(index: number) {
@@ -139,13 +158,27 @@ export function NodeInspector() {
               </div>
               <select
                 className="rounded-[var(--radius)] border border-border bg-background p-1.5 text-xs outline-none focus:ring-2 focus:ring-primary"
-                value={opt.url !== undefined ? "url" : "next"}
-                onChange={(e) => setOptionAction(i, e.target.value as "next" | "url")}
+                value={optionActionKind(opt)}
+                onChange={(e) => setOptionAction(i, e.target.value as "next" | "url" | "trackedLink")}
               >
                 <option value="next">Vai para node do fluxo</option>
                 <option value="url">Abre link externo (URL)</option>
+                <option value="trackedLink">Abre link rastreado (com clique/CTR)</option>
               </select>
-              {opt.url !== undefined ? (
+              {opt.trackedLinkId !== undefined ? (
+                <select
+                  className="rounded-[var(--radius)] border border-border bg-background p-1.5 text-xs outline-none focus:ring-2 focus:ring-primary"
+                  value={opt.trackedLinkId}
+                  onChange={(e) => updateOption(i, { trackedLinkId: e.target.value })}
+                >
+                  <option value="">Escolha um link rastreado...</option>
+                  {(trackedLinks ?? []).map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.label}
+                    </option>
+                  ))}
+                </select>
+              ) : opt.url !== undefined ? (
                 <input
                   className="rounded-[var(--radius)] border border-border bg-background p-1.5 text-xs outline-none focus:ring-2 focus:ring-primary"
                   placeholder="https://..."
@@ -166,14 +199,30 @@ export function NodeInspector() {
                   ))}
                 </select>
               )}
+              {opt.trackedLinkId !== undefined && !trackedLinks?.length && (
+                <span className="text-xs text-muted-foreground">
+                  Nenhum link rastreado criado ainda — crie um em &ldquo;Links rastreados&rdquo; primeiro.
+                </span>
+              )}
+              {opt.next !== undefined && (
+                <label className="flex items-center gap-1.5 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={opt.followGate ?? false}
+                    onChange={(e) => updateOption(i, { followGate: e.target.checked })}
+                  />
+                  Exigir seguir a conta antes de liberar
+                </label>
+              )}
             </div>
           ))}
           {options.length === 0 && (
             <p className="text-xs text-muted-foreground">Nenhum botão ainda — clique em &ldquo;Adicionar&rdquo;.</p>
           )}
-          {options.some((o) => o.url !== undefined) && (
+          {options.some((o) => o.url !== undefined || o.trackedLinkId !== undefined) && (
             <p className="text-xs text-muted-foreground">
-              Com botão de link externo, a Meta limita a 3 botões por mensagem (mistura link + node é permitida).
+              Com botão de link (externo ou rastreado), a Meta limita a 3 botões por mensagem (mistura link + node
+              é permitida).
             </p>
           )}
         </div>
@@ -238,8 +287,7 @@ export function NodeInspector() {
             </select>
           </div>
           <span className="text-xs text-muted-foreground">
-            Agendamento real (BullMQ) ainda não implementado — por enquanto o fluxo segue direto pro
-            próximo node sem pausar de verdade. Ver docs/07 (Wave 3).
+            O fluxo pausa de verdade nesse tempo (agendado via fila) antes de seguir pro próximo node.
           </span>
         </label>
       )}
