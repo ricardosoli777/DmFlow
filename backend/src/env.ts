@@ -12,10 +12,17 @@ const schema = z.object({
   // RNF10 — base pública do dashboard, usada pra montar o link de login por
   // e-mail (`{PUBLIC_APP_URL}/login/verify?token=...`).
   PUBLIC_APP_URL: z.string().default("http://localhost:3000"),
-  // Envio de e-mail do magic-link via Resend. Sem chave configurada, o link
-  // só é impresso no console (dev/local) — mesmo padrão de fallback já usado
-  // pra Graph API sem token (ver worker/src/services/instagram.ts).
+  // Envio de e-mail do magic-link — duas opções, nessa ordem de prioridade
+  // (ver backend/src/lib/email.ts e README.md "Login por e-mail"):
+  // 1. Resend (RESEND_API_KEY) — recomendado, precisa de domínio verificado.
+  // 2. Gmail com senha de app (GMAIL_USER/GMAIL_APP_PASSWORD) — sem domínio,
+  //    mas limite baixo de envio (~500/dia) e mais chance de cair em spam.
+  // Sem nenhuma das duas, o link só é impresso no console (dev/local) —
+  // mesmo padrão de fallback já usado pra Graph API sem token (ver
+  // worker/src/services/instagram.ts).
   RESEND_API_KEY: z.string().default(""),
+  GMAIL_USER: z.string().default(""),
+  GMAIL_APP_PASSWORD: z.string().default(""),
   EMAIL_FROM: z.string().default("DMFlow <login@dmflow.example.com>"),
 });
 

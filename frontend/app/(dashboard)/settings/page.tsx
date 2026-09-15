@@ -9,33 +9,82 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 
+// Ordem e conteúdo batem com o passo a passo de docs/04-integracao-meta.md —
+// cada campo já abre direto a tela certa da Meta, em vez de só descrever.
 const HELP = {
-  appId: [
-    "Acesse developers.facebook.com/apps e abra seu app",
-    "Menu lateral → Configurações do app → Básico",
-    "O 'ID do aplicativo' aparece bem no topo da página",
-  ],
-  appSecret: [
-    "Mesma página do App ID (Configurações do app → Básico)",
-    "Logo abaixo, campo 'Chave secreta do aplicativo'",
-    "Clique em 'Mostrar' (pede sua senha do Facebook de novo)",
-  ],
-  igUserId: [
-    "Acesse business.facebook.com → Configurações do negócio",
-    "Menu lateral → Contas → Contas do Instagram",
-    "Clique na sua conta — o ID aparece nos detalhes dela",
-  ],
-  verifyToken: [
-    "Não vem da Meta — você mesmo inventa (ex: uma senha aleatória)",
-    "Use o mesmo valor aqui e ao configurar o Webhook no app",
-    "Lá: produto Instagram → Webhooks → Editar assinatura → 'Verificar token'",
-  ],
-  pageAccessToken: [
-    "Dentro do app → produto Instagram → 'API setup with Instagram business login'",
-    "Na etapa 'Gerar tokens de acesso', ache a linha da sua conta",
-    "Clique em 'Gerar token' e copie o valor completo",
-  ],
+  appId: {
+    steps: [
+      "Acesse developers.facebook.com/apps e abra seu app (ou crie um do tipo Business)",
+      "Menu lateral → Configurações do app → Básico",
+      "O 'ID do aplicativo' aparece bem no topo da página",
+    ],
+    link: { label: "Abrir developers.facebook.com/apps", url: "https://developers.facebook.com/apps" },
+  },
+  appSecret: {
+    steps: [
+      "Mesma página do App ID (Configurações do app → Básico)",
+      "Logo abaixo, campo 'Chave secreta do aplicativo'",
+      "Clique em 'Mostrar' (pede sua senha do Facebook de novo)",
+    ],
+    link: { label: "Abrir developers.facebook.com/apps", url: "https://developers.facebook.com/apps" },
+  },
+  pageAccessToken: {
+    steps: [
+      "Dentro do app → Adicionar produto → Instagram → 'API setup with Instagram business login'",
+      "Na etapa 'Generate access tokens', ache a linha da sua conta",
+      "Clique em 'Gerar token' e copie o valor completo (começa com 'EAA')",
+    ],
+    link: { label: "Abrir developers.facebook.com/apps", url: "https://developers.facebook.com/apps" },
+  },
+  igUserId: {
+    steps: [
+      "Ferramentas → Graph API Explorer, com o token gerado no passo anterior",
+      "Rode: GET /me/accounts?fields=instagram_business_account",
+      "Na resposta, o campo instagram_business_account.id é o valor (é um número, não o @usuário)",
+    ],
+    link: {
+      label: "Abrir Graph API Explorer",
+      url: "https://developers.facebook.com/tools/explorer/",
+    },
+  },
+  verifyToken: {
+    steps: [
+      "Não vem da Meta — você mesmo inventa (ex: uma senha aleatória)",
+      "Use o mesmo valor aqui e ao configurar o Webhook no app",
+      "Lá: produto Instagram → Webhooks → Editar assinatura → 'Verificar token'",
+    ],
+  },
 };
+
+// Validação de formato em tempo real — heurística (não é garantia da Meta
+// aceitar), só evita erro bobo de colar a coisa errada no campo errado
+// antes mesmo de testar a conexão.
+const FORMAT_HINTS: Record<keyof FormState, { test: (v: string) => boolean; hint: string }> = {
+  appId: { test: (v) => /^\d{8,20}$/.test(v), hint: "Deve ser só números (geralmente 15-16 dígitos)" },
+  appSecret: { test: (v) => /^[a-f0-9]{32}$/i.test(v), hint: "Deve ter 32 caracteres em hexadecimal (0-9, a-f)" },
+  pageAccessToken: { test: (v) => /^EAA[A-Za-z0-9]{20,}$/.test(v), hint: "Tokens da Meta começam com 'EAA' e são bem longos" },
+  igUserId: { test: (v) => /^\d{8,25}$/.test(v), hint: "Deve ser só números — confirma que não colou o @usuário" },
+  verifyToken: { test: (v) => v.trim().length >= 6, hint: "Escolha algo com pelo menos 6 caracteres" },
+};
+
+// Traduz os erros mais comuns da Graph API pra algo acionável — a mensagem
+// crua da Meta ainda fica disponível expandindo "ver detalhe técnico".
+function friendlyConnectionError(raw: string): string {
+  const lower = raw.toLowerCase();
+  if (lower.includes("invalid oauth access token") || lower.includes("error validating access token")) {
+    return "O Page Access Token está inválido ou expirou — gere um novo (veja o ícone de ajuda do campo).";
+  }
+  if (lower.includes("unsupported get request") || lower.includes("does not exist")) {
+    return "Esse IG User ID não foi encontrado — confirme que é o ID da conta Instagram Business, não da Página do Facebook nem o @usuário.";
+  }
+  if (lower.includes("permission")) {
+    return "Esse token não tem permissão pra essa conta — confirme que você é admin/testador do app e que a conta Instagram está vinculada a ele.";
+  }
+  if (lower.includes("faltam credenciais")) {
+    return "Preencha pelo menos o Page Access Token e o IG User ID pra testar a conexão.";
+  }
+  return "Não consegui conectar com essas credenciais.";
+}
 
 type InstagramAccountStatus = {
   id: string;
@@ -53,12 +102,12 @@ type InstagramAccountStatus = {
 type FormState = {
   appId: string;
   appSecret: string;
-  verifyToken: string;
   pageAccessToken: string;
   igUserId: string;
+  verifyToken: string;
 };
 
-const emptyForm: FormState = { appId: "", appSecret: "", verifyToken: "", pageAccessToken: "", igUserId: "" };
+const emptyForm: FormState = { appId: "", appSecret: "", pageAccessToken: "", igUserId: "", verifyToken: "" };
 
 // RF17 — um workspace pode ter várias contas Instagram conectadas; cada
 // card abaixo é uma conta, com status real (chama a Graph API) + form pra
@@ -105,6 +154,7 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
   const queryClient = useQueryClient();
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [showTechnicalError, setShowTechnicalError] = useState(false);
 
   const save = useMutation({
     mutationFn: (body: Partial<FormState>) => api.put<InstagramAccountStatus>(`/instagram-accounts/${account.id}`, body),
@@ -113,7 +163,10 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
       setForm(emptyForm);
       queryClient.invalidateQueries({ queryKey: ["instagram-accounts"] });
     },
-    onError: (err: unknown) => setSaveError(err instanceof Error ? err.message : "Não foi possível salvar."),
+    onError: (err: unknown) => {
+      setShowTechnicalError(false);
+      setSaveError(err instanceof Error ? err.message : "Não foi possível salvar.");
+    },
   });
 
   const remove = useMutation({
@@ -130,6 +183,10 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
   function handleDelete() {
     if (!window.confirm("Desconectar essa conta? Contatos e histórico ficam guardados, só a conexão some.")) return;
     remove.mutate();
+  }
+
+  function field(key: keyof FormState) {
+    return form[key];
   }
 
   return (
@@ -164,7 +221,7 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
             <XCircle className="text-danger" size={20} />
             <div>
               <p className="text-sm font-medium">Não conectado</p>
-              {account.error && <p className="text-xs text-muted-foreground">{account.error}</p>}
+              {account.error && <p className="text-xs text-muted-foreground">{friendlyConnectionError(account.error)}</p>}
             </div>
             <Badge variant="erro" className="ml-auto">
               Desconectado
@@ -175,8 +232,8 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
         <hr className="border-border" />
 
         <p className="text-sm text-muted-foreground">
-          Preencha os campos abaixo pra conectar (ou trocar) essa conta. Deixe em branco o que você não quer
-          alterar. Veja onde pegar cada valor em{" "}
+          Preencha os campos abaixo, na ordem, pra conectar (ou trocar) essa conta — cada um tem um botão que já
+          abre a tela certa da Meta. Deixe em branco o que você não quer alterar. Guia completo em{" "}
           <a
             href="https://github.com/ricardosoli777/DmFlow/blob/main/docs/04-integracao-meta.md"
             target="_blank"
@@ -190,46 +247,65 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field
-            label="App ID"
+            fieldKey="appId"
+            label="1. App ID"
             help={HELP.appId}
-            value={form.appId}
+            value={field("appId")}
             placeholder={account.appId || "ex: 1234567890123456"}
             onChange={(v) => setForm({ ...form, appId: v })}
           />
           <Field
-            label="App Secret"
+            fieldKey="appSecret"
+            label="2. App Secret"
             help={HELP.appSecret}
-            value={form.appSecret}
+            value={field("appSecret")}
             placeholder={account.hasAppSecret ? "•••••••••• (já configurado)" : ""}
             onChange={(v) => setForm({ ...form, appSecret: v })}
             type="password"
           />
-          <Field
-            label="IG User ID"
-            help={HELP.igUserId}
-            value={form.igUserId}
-            placeholder={account.igUserId || "ex: 17841400000000000"}
-            onChange={(v) => setForm({ ...form, igUserId: v })}
-          />
-          <Field
-            label="Verify Token"
-            help={HELP.verifyToken}
-            value={form.verifyToken}
-            placeholder={account.hasVerifyToken ? "•••••••••• (já configurado)" : ""}
-            onChange={(v) => setForm({ ...form, verifyToken: v })}
-          />
           <div className="sm:col-span-2">
             <Field
-              label="Page Access Token"
+              fieldKey="pageAccessToken"
+              label="3. Page Access Token"
               help={HELP.pageAccessToken}
-              value={form.pageAccessToken}
+              value={field("pageAccessToken")}
               placeholder={account.hasPageAccessToken ? "•••••••••• (já configurado)" : ""}
               onChange={(v) => setForm({ ...form, pageAccessToken: v })}
               type="password"
             />
           </div>
+          <Field
+            fieldKey="igUserId"
+            label="4. IG User ID"
+            help={HELP.igUserId}
+            value={field("igUserId")}
+            placeholder={account.igUserId || "ex: 17841400000000000"}
+            onChange={(v) => setForm({ ...form, igUserId: v })}
+          />
+          <Field
+            fieldKey="verifyToken"
+            label="5. Verify Token"
+            help={HELP.verifyToken}
+            value={field("verifyToken")}
+            placeholder={account.hasVerifyToken ? "•••••••••• (já configurado)" : ""}
+            onChange={(v) => setForm({ ...form, verifyToken: v })}
+          />
 
-          {saveError && <p className="text-sm text-danger sm:col-span-2">{saveError}</p>}
+          {saveError && (
+            <div className="text-sm text-danger sm:col-span-2">
+              <p>{friendlyConnectionError(saveError)}</p>
+              <button
+                type="button"
+                onClick={() => setShowTechnicalError((v) => !v)}
+                className="mt-1 text-xs underline text-muted-foreground hover:text-foreground"
+              >
+                {showTechnicalError ? "ocultar detalhe técnico" : "ver detalhe técnico"}
+              </button>
+              {showTechnicalError && (
+                <p className="mt-1 rounded bg-muted/50 p-2 font-mono text-xs text-muted-foreground">{saveError}</p>
+              )}
+            </div>
+          )}
 
           <div className="sm:col-span-2">
             <Button type="submit" disabled={save.isPending}>
@@ -243,6 +319,7 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
 }
 
 function Field({
+  fieldKey,
   label,
   help,
   value,
@@ -250,26 +327,34 @@ function Field({
   onChange,
   type = "text",
 }: {
+  fieldKey: keyof FormState;
   label: string;
-  help?: string[];
+  help?: { steps: string[]; link?: { label: string; url: string } };
   value: string;
   placeholder?: string;
   onChange: (value: string) => void;
   type?: string;
 }) {
+  const trimmed = value.trim();
+  const formatCheck = FORMAT_HINTS[fieldKey];
+  const showHint = trimmed.length > 0 && !formatCheck.test(trimmed);
+
   return (
     <label className="flex flex-col gap-1 text-sm">
       <span className="flex items-center gap-1.5">
         {label}
-        {help && <InfoTooltip steps={help} />}
+        {help && <InfoTooltip steps={help.steps} link={help.link} />}
       </span>
       <input
         type={type}
-        className="rounded-[var(--radius)] border border-border bg-background p-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+        className={`rounded-[var(--radius)] border bg-background p-2 text-sm outline-none focus:ring-2 focus:ring-primary ${
+          showHint ? "border-warning" : "border-border"
+        }`}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
       />
+      {showHint && <span className="text-xs text-warning">{formatCheck.hint}</span>}
     </label>
   );
 }

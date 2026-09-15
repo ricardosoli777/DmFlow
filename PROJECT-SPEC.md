@@ -36,11 +36,11 @@ Fonte de verdade pro loop SPEC→PLAN→EXECUTE→VERIFY de cada wave
 | RNF03 | Segurança do webhook | Toda requisição é validada via HMAC (`X-Hub-Signature-256`); payload inválido é rejeitado com 401 |
 | RNF04 | Auditoria | Todo evento bruto recebido da Meta é persistido em `events_raw`, permitindo replay |
 | RNF05 | Reprodutibilidade total | Clone limpo do repo + Docker sobe o app funcional sem instalar Node/Postgres/Redis manualmente |
-| RNF06 | Onboarding leigo | Pessoa sem conhecimento técnico segue só o `README.md` e sobe o app em até 15 minutos |
+| RNF06 | Onboarding leigo | Pessoa sem conhecimento técnico segue só o `README.md` e sobe o app em até 15 minutos. `/settings` reforça isso: campos na ordem do guia, com link direto pra tela certa da Meta, validação de formato em tempo real e erro de conexão traduzido pra algo acionável — ver `frontend/app/(dashboard)/settings/page.tsx` |
 | RNF07 | Sem exposição de segredos | Nenhuma credencial committada no repositório público; credenciais de infra via `.env`, credenciais da Meta configuradas por cada usuário em **Configurações**, guardadas no banco |
 | RNF08 | Observabilidade mínima | `messages_log` tem `status` (`ok\|skipped\|failed\|rate_limited\|follow_gate_pending`) e `reason` estruturados — dá pra diagnosticar falha/skip de envio sem ler log bruto nem acessar o código. Ver `worker/src/services/instagram.ts` |
 | RNF09 | Respeitar o rate limit de private replies da Meta (750/h por conta) | Acima de 740 envios/h, o node é reagendado automaticamente (nunca falha nem perde a mensagem) e fica logado como `rate_limited` — ver `checkSendRateLimit` em `worker/src/services/instagram.ts` |
-| RNF10 | Autenticação via magic-link, sem senha armazenada | `User` não tem `passwordHash`; login é só e-mail → link de uso único (15min) → JWT; toda rota protegida exige o JWT válido + membership no workspace do header `X-Workspace-Id` — ver `backend/src/lib/auth.ts` |
+| RNF10 | Autenticação via magic-link, sem senha armazenada | `User` não tem `passwordHash`; login é só e-mail → link de uso único (15min) → JWT; toda rota protegida exige o JWT válido + membership no workspace do header `X-Workspace-Id` — ver `backend/src/lib/auth.ts`. Envio do e-mail suporta Resend ou Gmail com senha de app (nessa ordem de prioridade), com fallback pra console.log sem nenhum configurado — ver `backend/src/lib/email.ts` e README.md "Login por e-mail" |
 
 ## Fora de escopo (v1)
 

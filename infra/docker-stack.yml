@@ -80,6 +80,8 @@ services:
       PUBLIC_API_URL: https://hooks.arkitekt.space
       PUBLIC_APP_URL: https://dmflow.arkitekt.space
       RESEND_API_KEY: ${RESEND_API_KEY}
+      GMAIL_USER: ${GMAIL_USER}
+      GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD}
       EMAIL_FROM: ${EMAIL_FROM}
     networks:
       - dmflow_internal

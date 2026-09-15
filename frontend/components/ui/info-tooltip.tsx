@@ -1,11 +1,15 @@
 "use client";
 
-import { Info } from "lucide-react";
+import { ExternalLink, Info } from "lucide-react";
 import { useState } from "react";
 
+type TooltipLink = { label: string; url: string };
+
 // Ícone "i" que abre um balão com passo a passo — usado nos campos de
-// credenciais em /settings pra explicar onde pegar cada valor.
-export function InfoTooltip({ steps }: { steps: string[] }) {
+// credenciais em /settings pra explicar onde pegar cada valor. `link`
+// (opcional) vira um botão que já abre a tela certa da Meta, pra não
+// precisar navegar manualmente até lá.
+export function InfoTooltip({ steps, link }: { steps: string[]; link?: TooltipLink }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -28,6 +32,18 @@ export function InfoTooltip({ steps }: { steps: string[] }) {
               <li key={i}>{step}</li>
             ))}
           </ol>
+          {link && (
+            <a
+              href={link.url}
+              target="_blank"
+              rel="noreferrer"
+              onMouseDown={(e) => e.preventDefault()}
+              className="mt-2 flex items-center gap-1 rounded-[var(--radius)] bg-primary/10 px-2 py-1.5 font-medium text-primary hover:bg-primary/20"
+            >
+              <ExternalLink size={12} />
+              {link.label}
+            </a>
+          )}
         </div>
       )}
     </span>

@@ -60,13 +60,48 @@ visualmente no dashboard, sem escrever código.
 ### 🔑 Login por e-mail (sem senha)
 
 O DMFlow não usa senha — o login é sempre um link de uso único mandado por
-e-mail (expira em 15 minutos). Pra receber esse e-mail de verdade (em vez de
-só aparecer no log do backend), crie uma conta grátis em
-[resend.com](https://resend.com), gere uma API key e preencha
-`RESEND_API_KEY`/`EMAIL_FROM` no `.env`. Suporta múltiplas pessoas: quem tem
-acesso ao workspace pode convidar outras em **Time** (`/settings/team`) —
-cada convite vira um link pra copiar e mandar, sem precisar configurar nada
-a mais.
+e-mail (expira em 15 minutos). Suporta múltiplas pessoas: quem tem acesso ao
+workspace pode convidar outras em **Time** (`/settings/team`) — cada convite
+vira um link pra copiar e mandar, sem precisar configurar nada a mais.
+
+Isso é configuração **de infraestrutura, feita uma vez só por quem hospeda**
+(mora no `.env`) — não é algo que cada pessoa que faz login precisa
+configurar. Sem nenhuma das opções abaixo preenchida, o link só aparece no
+log do backend (`docker compose logs -f backend` / `docker service logs
+dmflow_backend`) em vez de chegar por e-mail de verdade — funciona pra
+testar, mas ninguém mais consegue entrar sozinho.
+
+**Opção 1 — Resend** (recomendado: melhor entrega, mas exige domínio verificado)
+
+1. Crie uma conta grátis em [resend.com](https://resend.com/signup) (plano
+   free: 3.000 e-mails/mês).
+2. **Domains → Add Domain** → digite o domínio que você quer usar como
+   remetente (o mesmo do `EMAIL_FROM` no `.env`).
+3. Copie os registros DNS que a Resend mostrar (geralmente 1 MX + 1-2 TXT
+   de SPF/DKIM) e cadastre no painel onde esse domínio está registrado.
+4. Volte em **Domains** e clique **Verify DNS Records** (propagação pode
+   levar de minutos a horas).
+5. **API Keys → Create API Key** (permissão "Sending access" basta) — copie
+   a chave, ela só aparece uma vez.
+6. Cole em `RESEND_API_KEY` no `.env` e reinicie o backend.
+
+**Opção 2 — Gmail com senha de app** (sem domínio, mais simples de começar,
+mas limite de ~500 e-mails/dia e mais chance de cair em spam — melhor pra
+uso pessoal/poucos workspaces)
+
+1. Ative a **verificação em duas etapas** na sua conta Google, se ainda não
+   tiver: [myaccount.google.com/security](https://myaccount.google.com/security).
+2. Acesse [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
+   (só aparece com a verificação em duas etapas ativa).
+3. Dê um nome (ex: "DMFlow") e clique **Criar**. O Google mostra uma senha
+   de 16 letras — copie ela (não é a senha da sua conta, é uma senha só
+   pra esse uso).
+4. No `.env`: `GMAIL_USER=seuemail@gmail.com` e
+   `GMAIL_APP_PASSWORD=` (cole a senha de 16 letras, sem espaços).
+5. Preencha também `EMAIL_FROM` (pode ser o mesmo `GMAIL_USER`).
+6. Reinicie o backend.
+
+Se preencher as duas opções, o DMFlow usa a Resend primeiro.
 
 Isso sobe: banco de dados, fila, armazenamento de arquivos, API, worker
 (motor de automação) e o dashboard — tudo junto, isolado, sem precisar
