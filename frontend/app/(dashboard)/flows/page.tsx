@@ -8,6 +8,7 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FLOW_TEMPLATES } from "@/lib/flow-templates";
 
 type Flow = { id: string; name: string; updatedAt: string };
 
@@ -22,7 +23,10 @@ export default function FlowsPage() {
   });
 
   const createFlow = useMutation({
-    mutationFn: () => api.post<Flow>("/flows", { name: "Novo fluxo", definition: { nodes: [], start: "" } }),
+    mutationFn: (templateId: string) => {
+      const template = FLOW_TEMPLATES.find((item) => item.id === templateId) ?? FLOW_TEMPLATES[0];
+      return api.post<Flow>("/flows", { name: template.name, definition: template.definition });
+    },
     onSuccess: (flow) => {
       queryClient.invalidateQueries({ queryKey: ["flows"] });
       router.push(`/flows/${flow.id}`);
@@ -49,13 +53,28 @@ export default function FlowsPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Fluxos</h1>
-        <Button onClick={() => createFlow.mutate()} disabled={createFlow.isPending}>
+        <Button onClick={() => createFlow.mutate("blank")} disabled={createFlow.isPending}>
           {createFlow.isPending ? "Criando..." : "Novo fluxo"}
         </Button>
       </div>
 
       {createFlow.isError && <p className="text-sm text-danger">Não foi possível criar o fluxo.</p>}
       {deleteError && <p className="text-sm text-danger">{deleteError}</p>}
+
+      <section>
+        <h2 className="mb-3 text-sm font-medium">Começar por template</h2>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {FLOW_TEMPLATES.filter((template) => template.id !== "blank").map((template) => (
+            <Card key={template.id} className="p-4">
+              <p className="font-medium">{template.name}</p>
+              <p className="mt-1 min-h-10 text-xs text-muted-foreground">{template.description}</p>
+              <Button className="mt-3" size="sm" onClick={() => createFlow.mutate(template.id)} disabled={createFlow.isPending}>
+                Usar template
+              </Button>
+            </Card>
+          ))}
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {(flows ?? []).map((flow) => (

@@ -2,13 +2,14 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { manualSendQueue } from "../lib/queue";
+import { requireRole } from "../lib/auth";
 
 // RF11 — intervenção manual na inbox (envio direto, fora do flow automático).
 // Nunca envia síncrono (RNF02): só enfileira, o worker chama a Instagram
 // Messaging API de verdade e grava o messages_log (com status/reason —
 // RNF08) via worker/src/services/instagram.ts.
 export async function messageRoutes(app: FastifyInstance) {
-  app.post("/contacts/:id/messages", async (req, reply) => {
+  app.post("/contacts/:id/messages", { preHandler: requireRole("OWNER", "ADMIN") }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const body = z.object({ content: z.string().min(1) }).parse(req.body);
 

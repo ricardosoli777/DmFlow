@@ -14,7 +14,7 @@ export type FlowDefinitionNode = {
   next?: string;
   thenNext?: string;
   elseNext?: string;
-  options?: { label: string; next?: string; url?: string }[];
+  options?: { label: string; next?: string; url?: string; trackedLinkId?: string; followGate?: boolean }[];
   [key: string]: unknown;
 };
 

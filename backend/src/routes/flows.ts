@@ -2,6 +2,7 @@ import type { Prisma } from "@dmflow/db";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
+import { requireRole } from "../lib/auth";
 
 const flowNodeSchema = z.object({
   id: z.string(),
@@ -20,10 +21,62 @@ const flowNodeSchema = z.object({
   ]),
 });
 
-const flowDefinitionSchema = z.object({
-  nodes: z.array(flowNodeSchema.passthrough()),
-  start: z.string(),
-});
+export const flowDefinitionSchema = z
+  .object({
+    nodes: z.array(flowNodeSchema.passthrough()).min(1, "O fluxo precisa ter pelo menos um node"),
+    start: z.string().min(1, "Escolha um node inicial"),
+  })
+  .superRefine((definition, ctx) => {
+    const ids = new Set<string>();
+    for (const [index, node] of definition.nodes.entries()) {
+      if (ids.has(node.id)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["nodes", index, "id"], message: "ID de node duplicado" });
+      }
+      ids.add(node.id);
+    }
+    if (!ids.has(definition.start)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["start"], message: "O node inicial não existe" });
+    }
+
+    const nextByNode = new Map<string, string[]>();
+    for (const [index, node] of definition.nodes.entries()) {
+      const raw = node as Record<string, unknown>;
+      const targets = [raw.next, raw.thenNext, raw.elseNext];
+      const options = Array.isArray(raw.options) ? raw.options : [];
+      for (const option of options) {
+        if (option && typeof option === "object") targets.push((option as Record<string, unknown>).next);
+      }
+      const validTargets = targets.filter((target): target is string => typeof target === "string" && target.length > 0);
+      nextByNode.set(node.id, validTargets);
+      for (const target of validTargets) {
+        if (!ids.has(target)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["nodes", index],
+            message: `Node aponta para destino inexistente: ${target}`,
+          });
+        }
+      }
+    }
+
+    // Fluxos v1 são finitos: ciclos escondem automações que nunca acabam e
+    // podem gerar envios repetidos. O editor deve usar delay/condição para
+    // modelar ramificações, não loops (RF21).
+    const visiting = new Set<string>();
+    const visited = new Set<string>();
+    const visit = (id: string) => {
+      if (visiting.has(id)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["nodes"], message: "O fluxo contém um ciclo" });
+        return;
+      }
+      if (visited.has(id)) return;
+      visiting.add(id);
+      for (const target of nextByNode.get(id) ?? []) if (ids.has(target)) visit(target);
+      visiting.delete(id);
+      visited.add(id);
+    };
+    visit(definition.start);
+  });
 
 const saveSchema = z.object({
   name: z.string().min(1),
@@ -43,7 +96,7 @@ export async function flowRoutes(app: FastifyInstance) {
     return flow;
   });
 
-  app.post("/flows", async (req, reply) => {
+  app.post("/flows", { preHandler: requireRole("OWNER", "ADMIN") }, async (req, reply) => {
     const body = saveSchema.parse(req.body);
     const flow = await prisma.flow.create({
       data: { workspaceId: req.workspaceId, name: body.name, definition: body.definition as Prisma.InputJsonValue },
@@ -51,7 +104,7 @@ export async function flowRoutes(app: FastifyInstance) {
     return reply.status(201).send(flow);
   });
 
-  app.put("/flows/:id", async (req, reply) => {
+  app.put("/flows/:id", { preHandler: requireRole("OWNER", "ADMIN") }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const body = saveSchema.parse(req.body);
 
@@ -68,7 +121,7 @@ export async function flowRoutes(app: FastifyInstance) {
     });
   });
 
-  app.delete("/flows/:id", async (req, reply) => {
+  app.delete("/flows/:id", { preHandler: requireRole("OWNER", "ADMIN") }, async (req, reply) => {
     const { id } = req.params as { id: string };
 
     const existing = await prisma.flow.findUnique({ where: { id } });

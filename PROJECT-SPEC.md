@@ -54,3 +54,26 @@ Cada requisito acima é referenciado pelas etapas das Waves 1-4 em
 [`docs/07-plano-waves-spec-driven.md`](docs/07-plano-waves-spec-driven.md).
 Nenhuma etapa é considerada "VERIFY ok" sem apontar de volta pra pelo menos
 um RF/RNF daqui.
+
+## Melhorias de produção — Wave 8
+
+Estes requisitos fecham lacunas encontradas na revisão de confiabilidade em
+2026-09-15. Eles são obrigatórios antes de tratar o produto como pronto para
+uso por terceiros.
+
+| ID | Requisito | Critério de aceite |
+|---|---|---|
+| RF18 | Webhook idempotente | A mesma entrega da Meta, reenviada uma ou mais vezes, cria no máximo um `events_raw`, um `flow_run` e uma DM; a resposta HTTP continua 200 para reentregas válidas. |
+| RF19 | Permissões efetivas por papel | `MEMBER` só pode consultar dados do workspace; criar/editar/excluir flows, triggers, contatos, links, contas e enviar DM manual exige `ADMIN` ou `OWNER`. Ações de equipe seguem as regras já definidas em RF16. |
+| RF20 | Auditoria de webhook de saída | Cada node `webhook` registra no histórico do contato o status `ok` ou `failed`, código HTTP/motivo e não transforma resposta HTTP 4xx/5xx em sucesso silencioso. |
+| RF21 | Validação semântica do fluxo | A API rejeita fluxo sem início válido, IDs duplicados, referências a nodes inexistentes e ciclos; a UI mostra o erro recebido antes de salvar. |
+| RF22 | Templates de campanha | A tela de flows permite iniciar por templates de comentário→DM (link, cupom e follow gate), sem editar JSON manualmente. |
+| RF23 | Métrica por campanha | Cada clique rastreado é associado ao trigger/flow que o originou e o dashboard mostra cliques e CTR por campanha, além do total por link. |
+| RF24 | Inbox sincronizada | O dashboard consegue importar e atualizar conversas da Instagram dentro da janela/permissões permitidas pela API, com indicação clara do último sync. |
+| RF25 | Conexão Instagram simplificada | Além da configuração manual, o usuário pode conectar por OAuth oficial; provedores opcionais só podem ser oferecidos com custo, limites e alternativa direta claramente informados. |
+
+| ID | Requisito não funcional | Critério de aceite |
+|---|---|---|
+| RNF11 | Testes e CI confiáveis | `npm test`, `npm run lint` e `npm run build` passam na raiz; a CI executa os três e inclui ao menos testes de integração de autenticação, RBAC, webhook/HMAC, idempotência e fila. |
+| RNF12 | Segredos protegidos em repouso | Tokens da Meta são cifrados com chave de infraestrutura antes de persistir; logs e respostas da API nunca expõem seu valor. |
+| RNF13 | Operação recuperável | Falhas transitórias de entrega ou Graph API usam retry com backoff; falhas permanentes ficam auditáveis sem duplicar efeitos já concluídos. |

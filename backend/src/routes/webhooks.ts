@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma";
 import { instagramEventsQueue } from "../lib/queue";
@@ -34,9 +34,26 @@ export async function webhookRoutes(app: FastifyInstance) {
     const authentic = accounts.some((a) => isValidSignature(rawBody, signature, a.appSecret));
     if (!authentic) return reply.status(401).send({ error: "invalid signature" });
 
-    const event = await prisma.rawEvent.create({
-      data: { payload: req.body as any },
-    });
+    const dedupeKey = createHash("sha256").update(rawBody).digest("hex");
+    const existing = await prisma.rawEvent.findUnique({ where: { dedupeKey } });
+    // Reentrega válida: responder sucesso sem recolocar o mesmo evento na
+    // fila. Isso evita DMs e flow_runs duplicados (RF18).
+    if (existing) return reply.status(200).send({ received: true, duplicate: true });
+
+    let event;
+    try {
+      event = await prisma.rawEvent.create({
+        data: { payload: req.body as any, dedupeKey },
+      });
+    } catch (err) {
+      // Duas requisições idênticas podem passar juntas pelo findUnique acima.
+      // A constraint única é a autoridade final; a segunda também é uma
+      // reentrega bem-sucedida, não um erro 500 para a Meta (RF18).
+      if ((err as { code?: string }).code === "P2002") {
+        return reply.status(200).send({ received: true, duplicate: true });
+      }
+      throw err;
+    }
 
     await instagramEventsQueue.add("process-event", { eventId: event.id });
 

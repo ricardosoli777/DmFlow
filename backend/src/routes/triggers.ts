@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { instagramEventsQueue } from "../lib/queue";
+import { requireRole } from "../lib/auth";
 
 const createSchema = z
   .object({
@@ -48,7 +49,7 @@ export async function triggerRoutes(app: FastifyInstance) {
     return trigger;
   });
 
-  app.post("/triggers", async (req, reply) => {
+  app.post("/triggers", { preHandler: requireRole("OWNER", "ADMIN") }, async (req, reply) => {
     const body = createSchema.parse(req.body);
 
     const flow = await prisma.flow.findUnique({ where: { id: body.flowId } });
@@ -69,7 +70,7 @@ export async function triggerRoutes(app: FastifyInstance) {
     return reply.status(201).send(trigger);
   });
 
-  app.patch("/triggers/:id", async (req, reply) => {
+  app.patch("/triggers/:id", { preHandler: requireRole("OWNER", "ADMIN") }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const body = updateSchema.parse(req.body);
 
@@ -79,7 +80,7 @@ export async function triggerRoutes(app: FastifyInstance) {
     return prisma.postTrigger.update({ where: { id }, data: body });
   });
 
-  app.delete("/triggers/:id", async (req, reply) => {
+  app.delete("/triggers/:id", { preHandler: requireRole("OWNER", "ADMIN") }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const existing = await prisma.postTrigger.findUnique({ where: { id } });
     if (!existing || existing.workspaceId !== req.workspaceId) return reply.status(404).send({ error: "not found" });
@@ -93,7 +94,7 @@ export async function triggerRoutes(app: FastifyInstance) {
   // o trigger + flow estão funcionando de ponta a ponta. `entry[].id` usa a
   // primeira conta Instagram conectada do workspace — RF17: sem isso o
   // worker não teria como resolver o workspace do evento sintético.
-  app.post("/triggers/:id/test", async (req, reply) => {
+  app.post("/triggers/:id/test", { preHandler: requireRole("OWNER", "ADMIN") }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const trigger = await prisma.postTrigger.findUnique({ where: { id } });
     if (!trigger || trigger.workspaceId !== req.workspaceId) return reply.status(404).send({ error: "not found" });

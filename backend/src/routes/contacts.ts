@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
+import { requireRole } from "../lib/auth";
 
 // RF06, RF07 — listagem/filtro de contatos por tag, dados capturados no flow
 export async function contactRoutes(app: FastifyInstance) {
@@ -26,7 +27,7 @@ export async function contactRoutes(app: FastifyInstance) {
     return contact;
   });
 
-  app.patch("/contacts/:id", async (req, reply) => {
+  app.patch("/contacts/:id", { preHandler: requireRole("OWNER", "ADMIN") }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const body = z
       .object({
@@ -42,7 +43,7 @@ export async function contactRoutes(app: FastifyInstance) {
     return prisma.contact.update({ where: { id }, data: body });
   });
 
-  app.delete("/contacts/:id", async (req, reply) => {
+  app.delete("/contacts/:id", { preHandler: requireRole("OWNER", "ADMIN") }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const exists = await prisma.contact.findUnique({ where: { id } });
     if (!exists || exists.workspaceId !== req.workspaceId) return reply.status(404).send({ error: "not found" });

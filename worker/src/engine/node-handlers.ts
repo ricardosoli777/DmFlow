@@ -232,10 +232,37 @@ export const nodeHandlers: Record<FlowNode["type"], (args: HandlerArgs) => Promi
     return { nextNodeId: (node.next as string) ?? null, waitingForInput: false };
   },
 
-  webhook: async ({ node }) => {
+  webhook: async ({ node, contact }) => {
     const url = String(node.url ?? "");
-    if (url) {
-      await fetch(url, { method: "POST", body: JSON.stringify({ nodeId: node.id }) }).catch(() => null);
+    if (!url) return { nextNodeId: (node.next as string) ?? null, waitingForInput: false };
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nodeId: node.id, contactId: contact.id, attributes: contact.attributes }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      await prisma.message.create({
+        data: {
+          contactId: contact.id,
+          direction: "outbound",
+          content: `[webhook] ${url}`,
+          status: "ok",
+          reason: `HTTP ${response.status}`,
+        },
+      });
+    } catch (err) {
+      await prisma.message.create({
+        data: {
+          contactId: contact.id,
+          direction: "outbound",
+          content: `[webhook] ${url}`,
+          status: "failed",
+          reason: (err as Error).message,
+        },
+      });
     }
     return { nextNodeId: (node.next as string) ?? null, waitingForInput: false };
   },

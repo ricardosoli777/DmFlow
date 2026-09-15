@@ -248,9 +248,10 @@ describe("nodeHandlers — RF05 (um comportamento isolado por tipo de node)", ()
     expect(result).toEqual({ nextNodeId: "n2", waitingForInput: false });
   });
 
-  it("webhook: chama a URL configurada e avança mesmo se a chamada falhar", async () => {
+  it("webhook: registra falha da URL configurada e avança", async () => {
     const fetchMock = vi.fn().mockRejectedValue(new Error("network error"));
     vi.stubGlobal("fetch", fetchMock);
+    const prisma = getPrisma() as any;
 
     const node: FlowNode = { id: "n1", type: "webhook", url: "https://crm.example.com/hook", next: "n2" };
     const result = await nodeHandlers.webhook({ node, run, contact, account });
@@ -260,7 +261,24 @@ describe("nodeHandlers — RF05 (um comportamento isolado por tipo de node)", ()
       expect.objectContaining({ method: "POST" }),
     );
     expect(result).toEqual({ nextNodeId: "n2", waitingForInput: false });
+    expect(prisma.message.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "failed", reason: "network error" }) }),
+    );
 
+    vi.unstubAllGlobals();
+  });
+
+  it("webhook: registra sucesso e código HTTP", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204 });
+    vi.stubGlobal("fetch", fetchMock);
+    const prisma = getPrisma() as any;
+
+    const node: FlowNode = { id: "n1", type: "webhook", url: "https://crm.example.com/hook", next: "n2" };
+    await nodeHandlers.webhook({ node, run, contact, account });
+
+    expect(prisma.message.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "ok", reason: "HTTP 204" }) }),
+    );
     vi.unstubAllGlobals();
   });
 

@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { env } from "../env";
 import { prisma } from "../lib/prisma";
+import { requireRole } from "../lib/auth";
 
 const createSchema = z.object({
   label: z.string().min(1),
@@ -42,7 +43,7 @@ export async function trackedLinkRoutes(app: FastifyInstance) {
     }));
   });
 
-  app.post("/tracked-links", async (req, reply) => {
+  app.post("/tracked-links", { preHandler: requireRole("OWNER", "ADMIN") }, async (req, reply) => {
     const body = createSchema.parse(req.body);
     let code = generateCode();
     // colisão é raríssima (6 bytes aleatórios), mas não custa garantir
@@ -54,7 +55,7 @@ export async function trackedLinkRoutes(app: FastifyInstance) {
     return reply.status(201).send({ ...link, redirectUrl: toRedirectUrl(link.code) });
   });
 
-  app.patch("/tracked-links/:id", async (req, reply) => {
+  app.patch("/tracked-links/:id", { preHandler: requireRole("OWNER", "ADMIN") }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const body = updateSchema.parse(req.body);
     const exists = await prisma.trackedLink.findUnique({ where: { id } });
@@ -64,7 +65,7 @@ export async function trackedLinkRoutes(app: FastifyInstance) {
     return { ...link, redirectUrl: toRedirectUrl(link.code) };
   });
 
-  app.delete("/tracked-links/:id", async (req, reply) => {
+  app.delete("/tracked-links/:id", { preHandler: requireRole("OWNER", "ADMIN") }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const exists = await prisma.trackedLink.findUnique({ where: { id } });
     if (!exists || exists.workspaceId !== req.workspaceId) return reply.status(404).send({ error: "not found" });
