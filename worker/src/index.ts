@@ -1,4 +1,4 @@
-import { getInstagramAccountByIgUserId, getPrisma } from "@dmflow/db";
+import { assertCredentialsEncryptionKey, getInstagramAccountByIgUserId, getPrisma } from "@dmflow/db";
 import { Worker } from "bullmq";
 import { advanceFlowRun } from "./engine/executor";
 import { extractAccountIgUserId, parseMetaPayload } from "./engine/parse-meta-payload";
@@ -7,6 +7,7 @@ import { connection } from "./lib/queue";
 import { checkSendRateLimit, sendDirectMessage } from "./services/instagram";
 
 const prisma = getPrisma();
+assertCredentialsEncryptionKey();
 
 // RNF02 — consome a fila publicada pelo backend em /webhooks/instagram
 const worker = new Worker(
@@ -14,40 +15,38 @@ const worker = new Worker(
   async (job) => {
     const { eventId } = job.data as { eventId: string };
     const raw = await prisma.rawEvent.findUniqueOrThrow({ where: { id: eventId } });
+    if (raw.processed) return;
 
-    try {
-      // RF17 — resolve a qual conta/workspace esse evento pertence a partir
-      // do `entry[].id` do payload, ANTES de processar qualquer coisa — sem
-      // isso não dá pra saber com credenciais de quem responder.
-      const igUserId = extractAccountIgUserId(raw.payload);
-      const account = igUserId ? await getInstagramAccountByIgUserId(igUserId) : null;
+    // RF17 — resolve a qual conta/workspace esse evento pertence a partir
+    // do `entry[].id` do payload, ANTES de processar qualquer coisa — sem
+    // isso não dá pra saber com credenciais de quem responder.
+    const igUserId = extractAccountIgUserId(raw.payload);
+    const account = igUserId ? await getInstagramAccountByIgUserId(igUserId) : null;
 
-      if (!account) {
-        console.warn(`[worker] evento ${eventId} de conta desconhecida (igUserId=${igUserId ?? "?"}) — ignorado`);
-        return;
-      }
-
-      if (!raw.workspaceId) {
-        await prisma.rawEvent.update({ where: { id: eventId }, data: { workspaceId: account.workspaceId } });
-      }
-
-      const events = parseMetaPayload(raw.payload);
-      for (const event of events) {
-        await resolveEvent(event, account);
-      }
-    } finally {
-      // Marca como processado mesmo quando falha (ex: Meta recusa envio fora
-      // da janela de 24h) — esses erros são permanentes, reprocessar não
-      // resolve, e deixar `processed: false` pra sempre travava o indicador
-      // de saúde do dashboard achando que o worker tinha caído.
+    if (!account) {
+      console.warn(`[worker] evento ${eventId} de conta desconhecida (igUserId=${igUserId ?? "?"}) — ignorado`);
       await prisma.rawEvent.update({ where: { id: eventId }, data: { processed: true } });
+      return;
     }
+
+    if (!raw.workspaceId) {
+      await prisma.rawEvent.update({ where: { id: eventId }, data: { workspaceId: account.workspaceId } });
+    }
+
+    const events = parseMetaPayload(raw.payload);
+    for (const event of events) {
+      await resolveEvent(event, account);
+    }
+    await prisma.rawEvent.update({ where: { id: eventId }, data: { processed: true } });
   },
   { connection, concurrency: 5 },
 );
 
-worker.on("failed", (job, err) => {
+worker.on("failed", async (job, err) => {
   console.error(`[worker] evento ${job?.id} falhou:`, err.message);
+  if (!job || job.attemptsMade < (job.opts.attempts ?? 1)) return;
+  const { eventId } = job.data as { eventId: string };
+  await prisma.rawEvent.update({ where: { id: eventId }, data: { processed: true } });
 });
 
 // RF11 — envio manual da Inbox (enfileirado por backend/src/routes/messages.ts).
@@ -110,3 +109,4 @@ flowResumeWorker.on("failed", (job, err) => {
 console.log(
   "DMFlow worker rodando — aguardando eventos nas filas instagram-events, manual-sends e flow-resume",
 );
+

@@ -1,4 +1,4 @@
-import { listInstagramAccounts, saveInstagramAccount } from "@dmflow/db";
+import { getInstagramAccount, listInstagramAccounts, saveInstagramAccount } from "@dmflow/db";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { requireRole } from "../lib/auth";
@@ -47,7 +47,7 @@ export async function instagramAccountRoutes(app: FastifyInstance) {
       const { id } = req.params as { id: string };
       const body = updateSchema.parse(req.body);
 
-      const existing = await prisma.instagramAccount.findUnique({ where: { id } });
+      const existing = await getInstagramAccount(id);
       if (!existing || existing.workspaceId !== req.workspaceId) return reply.status(404).send({ error: "not found" });
 
       // valida contra a API de verdade antes de salvar — não deixa gravar
@@ -99,3 +99,4 @@ export async function checkInstagramConnection(
     return { connected: false, error: err instanceof Error ? err.message : "Erro desconhecido" };
   }
 }
+

@@ -165,7 +165,7 @@ pra produção).
 
 ## Wave 8 — Confiabilidade, governança e paridade de produto
 
-Fonte de verdade: requisitos RF18–RF25 e RNF11–RNF13 no
+Fonte de verdade: requisitos RF18–RF24 e RNF11–RNF13 no
 [`PROJECT-SPEC.md`](../PROJECT-SPEC.md).
 
 | Etapa | Entrega | Critério de aceite |
@@ -174,7 +174,6 @@ Fonte de verdade: requisitos RF18–RF25 e RNF11–RNF13 no
 | 8B — Governança | RBAC aplicado a toda mutação e segredos cifrados | Um MEMBER recebe 403 ao mutar; banco não guarda tokens em texto puro |
 | 8C — Qualidade de fluxo | Validação semântica e templates | Fluxo inválido é rejeitado antes de persistir; campanha comum nasce de template |
 | 8D — Analytics e inbox | CTR por campanha e sincronização permitida pela API | Dashboard mostra atribuição e informa a hora do último sync |
-| 8E — Conexão | OAuth oficial e opção de provedor declarada | Usuário conecta sem colar segredos; custos/limites são explícitos |
 
 ---
 
@@ -194,3 +193,4 @@ Wave 0 (fundação)
                                                               ▼
                                           Wave 7 (hardening, contínua)
 ```
+

@@ -70,10 +70,10 @@ uso por terceiros.
 | RF22 | Templates de campanha | A tela de flows permite iniciar por templates de comentário→DM (link, cupom e follow gate), sem editar JSON manualmente. |
 | RF23 | Métrica por campanha | Cada clique rastreado é associado ao trigger/flow que o originou e o dashboard mostra cliques e CTR por campanha, além do total por link. |
 | RF24 | Inbox sincronizada | O dashboard consegue importar e atualizar conversas da Instagram dentro da janela/permissões permitidas pela API, com indicação clara do último sync. |
-| RF25 | Conexão Instagram simplificada | Além da configuração manual, o usuário pode conectar por OAuth oficial; provedores opcionais só podem ser oferecidos com custo, limites e alternativa direta claramente informados. |
 
 | ID | Requisito não funcional | Critério de aceite |
 |---|---|---|
 | RNF11 | Testes e CI confiáveis | `npm test`, `npm run lint` e `npm run build` passam na raiz; a CI executa os três e inclui ao menos testes de integração de autenticação, RBAC, webhook/HMAC, idempotência e fila. |
 | RNF12 | Segredos protegidos em repouso | Tokens da Meta são cifrados com chave de infraestrutura antes de persistir; logs e respostas da API nunca expõem seu valor. |
 | RNF13 | Operação recuperável | Falhas transitórias de entrega ou Graph API usam retry com backoff; falhas permanentes ficam auditáveis sem duplicar efeitos já concluídos. |
+

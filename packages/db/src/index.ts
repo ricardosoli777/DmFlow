@@ -10,3 +10,5 @@ export function getPrisma(): PrismaClient {
 }
 
 export * from "./settings";
+export * from "./credentials";
+

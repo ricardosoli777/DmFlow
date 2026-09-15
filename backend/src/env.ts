@@ -5,6 +5,7 @@ const schema = z.object({
   DATABASE_URL: z.string(),
   REDIS_URL: z.string().default("redis://redis:6379"),
   JWT_SECRET: z.string().min(16),
+  META_CREDENTIALS_ENCRYPTION_KEY: z.string().min(1),
   // RF14 — base pública do backend, usada pra montar a URL de redirect dos
   // links rastreados (`{PUBLIC_API_URL}/r/{code}`). Em produção é a mesma
   // URL do webhook (ex: https://hooks.example.com).
@@ -27,3 +28,4 @@ const schema = z.object({
 });
 
 export const env = schema.parse(process.env);
+

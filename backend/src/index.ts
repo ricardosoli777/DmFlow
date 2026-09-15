@@ -1,5 +1,6 @@
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
+import { assertCredentialsEncryptionKey, encryptStoredInstagramCredentials } from "@dmflow/db";
 import Fastify from "fastify";
 import { env } from "./env";
 import { requireAuth } from "./lib/auth";
@@ -29,6 +30,10 @@ app.addContentTypeParser("application/json", { parseAs: "buffer" }, (req, body, 
 });
 
 async function bootstrap() {
+  assertCredentialsEncryptionKey();
+  const encryptedAccounts = await encryptStoredInstagramCredentials();
+  if (encryptedAccounts) app.log.info({ encryptedAccounts }, "Credenciais Meta legadas cifradas");
+
   await app.register(cors, { origin: true });
   await app.register(jwt, { secret: env.JWT_SECRET });
 
@@ -64,3 +69,4 @@ bootstrap().catch((err) => {
   app.log.error(err);
   process.exit(1);
 });
+

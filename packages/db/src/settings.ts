@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { InstagramAccount } from "@prisma/client";
 import { getPrisma } from "./index";
+import { decryptInstagramAccount, encryptCredentials } from "./credentials";
 
 const CACHE_TTL_MS = 15_000;
 const cacheById = new Map<string, { value: InstagramAccount; expiresAt: number }>();
@@ -27,8 +28,10 @@ export async function getInstagramAccount(id: string): Promise<InstagramAccount 
 
   const prisma = getPrisma();
   const account = await prisma.instagramAccount.findUnique({ where: { id } });
-  if (account) cacheById.set(id, { value: account, expiresAt: Date.now() + CACHE_TTL_MS });
-  return account;
+  if (!account) return null;
+  const decrypted = decryptInstagramAccount(account);
+  cacheById.set(id, { value: decrypted, expiresAt: Date.now() + CACHE_TTL_MS });
+  return decrypted;
 }
 
 /**
@@ -39,12 +42,24 @@ export async function getInstagramAccount(id: string): Promise<InstagramAccount 
  */
 export async function getInstagramAccountByIgUserId(igUserId: string): Promise<InstagramAccount | null> {
   const prisma = getPrisma();
-  return prisma.instagramAccount.findUnique({ where: { igUserId } });
+  const account = await prisma.instagramAccount.findUnique({ where: { igUserId } });
+  return account ? decryptInstagramAccount(account) : null;
 }
 
 export async function listInstagramAccounts(workspaceId: string): Promise<InstagramAccount[]> {
   const prisma = getPrisma();
-  return prisma.instagramAccount.findMany({ where: { workspaceId }, orderBy: { createdAt: "asc" } });
+  const accounts = await prisma.instagramAccount.findMany({ where: { workspaceId }, orderBy: { createdAt: "asc" } });
+  return accounts.map(decryptInstagramAccount);
+}
+
+export async function listAllInstagramAccounts(): Promise<InstagramAccount[]> {
+  const accounts = await getPrisma().instagramAccount.findMany();
+  return accounts.map(decryptInstagramAccount);
+}
+
+export async function getFirstInstagramAccount(workspaceId: string): Promise<InstagramAccount | null> {
+  const account = await getPrisma().instagramAccount.findFirst({ where: { workspaceId } });
+  return account ? decryptInstagramAccount(account) : null;
 }
 
 /**
@@ -58,14 +73,41 @@ export async function saveInstagramAccount(
   partial: InstagramAccountInput,
 ): Promise<InstagramAccount> {
   const prisma = getPrisma();
+  const encrypted = encryptCredentials(partial);
   const account = id
-    ? await prisma.instagramAccount.update({ where: { id }, data: partial })
+    ? await prisma.instagramAccount.update({ where: { id }, data: encrypted })
     : await prisma.instagramAccount.create({
-        data: { workspaceId, ...partial, igUserId: partial.igUserId || `pending-${randomUUID()}` },
+        data: { workspaceId, ...encrypted, igUserId: encrypted.igUserId || `pending-${randomUUID()}` },
       });
 
   cacheById.delete(account.id);
-  return account;
+  return decryptInstagramAccount(account);
+}
+
+export async function encryptStoredInstagramCredentials(): Promise<number> {
+  const prisma = getPrisma();
+  const accounts = await prisma.instagramAccount.findMany();
+  let migrated = 0;
+
+  for (const account of accounts) {
+    const encrypted = encryptCredentials({
+      appSecret: account.appSecret,
+      verifyToken: account.verifyToken,
+      pageAccessToken: account.pageAccessToken,
+    });
+    if (
+      encrypted.appSecret === account.appSecret &&
+      encrypted.verifyToken === account.verifyToken &&
+      encrypted.pageAccessToken === account.pageAccessToken
+    ) {
+      continue;
+    }
+    await prisma.instagramAccount.update({ where: { id: account.id }, data: encrypted });
+    cacheById.delete(account.id);
+    migrated += 1;
+  }
+
+  return migrated;
 }
 
 export async function deleteInstagramAccount(id: string): Promise<void> {
@@ -73,3 +115,4 @@ export async function deleteInstagramAccount(id: string): Promise<void> {
   await prisma.instagramAccount.delete({ where: { id } });
   cacheById.delete(id);
 }
+

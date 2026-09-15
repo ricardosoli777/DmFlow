@@ -46,7 +46,9 @@ visualmente no dashboard, sem escrever código.
    as senhas genéricas de banco/fila (`troque_esta_senha...`) por valores
    seus — **não precisa preencher nenhuma credencial da Meta aqui**, isso é
    feito depois, dentro do próprio app. Login não usa senha (é por link de
-   e-mail — ver [`RESEND_API_KEY`](#-login-por-e-mail-sem-senha) abaixo).
+   e-mail — ver [`RESEND_API_KEY`](#-login-por-e-mail-sem-senha) abaixo). Gere
+   também `META_CREDENTIALS_ENCRYPTION_KEY` com `openssl rand -base64 32`: ela
+   cifra as credenciais da Meta antes de gravá-las no banco.
 5. Rode o script de novo. Ele vai baixar as imagens prontas e subir tudo.
 6. Acesse **http://localhost:3000**, digite o e-mail que você colocou em
    `DASHBOARD_ADMIN_EMAIL` — sem `RESEND_API_KEY` configurada, o link de
@@ -262,3 +264,4 @@ DMFlow/
 
 Ver [`docs/07-plano-waves-spec-driven.md`](docs/07-plano-waves-spec-driven.md)
 pro estado detalhado de cada etapa.
+

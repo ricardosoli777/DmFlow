@@ -1,7 +1,6 @@
-import { getInstagramAccount } from "@dmflow/db";
+import { getFirstInstagramAccount, getInstagramAccount } from "@dmflow/db";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { prisma } from "../lib/prisma";
 
 type IgMedia = {
   id: string;
@@ -22,7 +21,7 @@ export async function instagramMediaRoutes(app: FastifyInstance) {
 
     const account = query.accountId
       ? await getInstagramAccount(query.accountId)
-      : await prisma.instagramAccount.findFirst({ where: { workspaceId: req.workspaceId } });
+      : await getFirstInstagramAccount(req.workspaceId);
 
     if (!account || account.workspaceId !== req.workspaceId) {
       return reply.status(400).send({ error: "Instagram não conectado — configure em Configurações" });
@@ -44,3 +43,4 @@ export async function instagramMediaRoutes(app: FastifyInstance) {
     return { media: data.data ?? [] };
   });
 }
+
