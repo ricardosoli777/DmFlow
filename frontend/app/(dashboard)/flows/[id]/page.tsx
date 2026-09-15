@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { BookmarkPlus, CheckCircle2, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { fromDefinition, toDefinition, type FlowDefinition } from "@/lib/flow-definition";
@@ -76,6 +76,18 @@ export default function FlowEditorPage({ params }: { params: { id: string } }) {
     },
   });
 
+  const saveAsTemplate = useMutation({
+    mutationFn: () => {
+      const templateName = window.prompt("Nome do template", name.trim() || "Novo template");
+      if (!templateName?.trim()) return Promise.resolve(null);
+      const description = window.prompt("Descrição curta (opcional)", "") ?? "";
+      return api.post("/flow-templates", { name: templateName.trim(), description, definition: toDefinition(nodes, edges) });
+    },
+    onSuccess: (template) => {
+      if (template) queryClient.invalidateQueries({ queryKey: ["flow-templates"] });
+    },
+  });
+
   if (isLoading) {
     return <p className="p-8 text-sm text-muted-foreground">Carregando fluxo...</p>;
   }
@@ -109,6 +121,9 @@ export default function FlowEditorPage({ params }: { params: { id: string } }) {
           )}
           <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending || !dirty}>
             {save.isPending ? "Salvando..." : "Salvar"}
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => saveAsTemplate.mutate()} disabled={saveAsTemplate.isPending}>
+            <BookmarkPlus size={14} /> {saveAsTemplate.isPending ? "Salvando..." : "Salvar como template"}
           </Button>
         </div>
       </div>

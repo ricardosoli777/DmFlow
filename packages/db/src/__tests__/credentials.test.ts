@@ -36,4 +36,3 @@ describe("Meta credential encryption", () => {
     expect(encrypted.pageAccessToken).toMatch(/^enc:v1:/);
   });
 });
-

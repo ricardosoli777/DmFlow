@@ -99,4 +99,3 @@ export async function checkInstagramConnection(
     return { connected: false, error: err instanceof Error ? err.message : "Erro desconhecido" };
   }
 }
-

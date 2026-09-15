@@ -76,4 +76,3 @@ uso por terceiros.
 | RNF11 | Testes e CI confiáveis | `npm test`, `npm run lint` e `npm run build` passam na raiz; a CI executa os três e inclui ao menos testes de integração de autenticação, RBAC, webhook/HMAC, idempotência e fila. |
 | RNF12 | Segredos protegidos em repouso | Tokens da Meta são cifrados com chave de infraestrutura antes de persistir; logs e respostas da API nunca expõem seu valor. |
 | RNF13 | Operação recuperável | Falhas transitórias de entrega ou Graph API usam retry com backoff; falhas permanentes ficam auditáveis sem duplicar efeitos já concluídos. |
-

@@ -58,7 +58,7 @@ services:
         condition: on-failure
 
   migrate:
-    image: ghcr.io/ricardosoli777/dmflow-backend:latest
+    image: ghcr.io/ricardosoli777/dmflow-backend:${DMFLOW_IMAGE_TAG:?DMFLOW_IMAGE_TAG is required}
     command: sh -c "npx prisma migrate deploy --schema=/app/node_modules/@dmflow/db/prisma/schema.prisma && node dist/seed.js"
     environment:
       DATABASE_URL: ${DATABASE_URL}
@@ -100,7 +100,7 @@ services:
         - "traefik.http.services.dmflow-hooks.loadbalancer.server.port=4000"
 
   worker:
-    image: ghcr.io/ricardosoli777/dmflow-worker:latest
+    image: ghcr.io/ricardosoli777/dmflow-worker:${DMFLOW_IMAGE_TAG:?DMFLOW_IMAGE_TAG is required}
     environment:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: redis://dmflow-redis:6379
@@ -113,7 +113,7 @@ services:
         condition: on-failure
 
   frontend:
-    image: ghcr.io/ricardosoli777/dmflow-frontend:latest
+    image: ghcr.io/ricardosoli777/dmflow-frontend:${DMFLOW_IMAGE_TAG:?DMFLOW_IMAGE_TAG is required}
     networks:
       - Arkitekt
     deploy:
@@ -140,4 +140,3 @@ volumes:
   dmflow_postgres_data:
   dmflow_redis_data:
   dmflow_minio_data:
-

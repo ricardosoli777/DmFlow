@@ -42,6 +42,7 @@ model Workspace {
   instagramAccounts InstagramAccount[]
   contacts          Contact[]
   flows             Flow[]
+  flowTemplates     FlowTemplate[]
   triggers          PostTrigger[]
   rawEvents         RawEvent[]
   trackedLinks      TrackedLink[]
@@ -154,6 +155,21 @@ model Flow {
   runs        FlowRun[]
 
   @@map("flows")
+}
+
+// Snapshot reutilizável de um fluxo. Diferente dos exemplos fixos do frontend,
+// pertence ao workspace e pode ser editado sem afetar fluxos já criados.
+model FlowTemplate {
+  id          String    @id @default(uuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  name        String
+  description String    @default("")
+  definition  Json
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("flow_templates")
 }
 
 model PostTrigger {

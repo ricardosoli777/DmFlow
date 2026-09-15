@@ -193,4 +193,3 @@ Wave 0 (fundação)
                                                               ▼
                                           Wave 7 (hardening, contínua)
 ```
-

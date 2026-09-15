@@ -115,4 +115,3 @@ export async function deleteInstagramAccount(id: string): Promise<void> {
   await prisma.instagramAccount.delete({ where: { id } });
   cacheById.delete(id);
 }
-

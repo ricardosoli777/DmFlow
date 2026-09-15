@@ -16,4 +16,3 @@ export const instagramEventsQueue = new Queue("instagram-events", { connection, 
 // Envio manual pela Inbox (RF11) — nunca síncrono (RNF02), o worker consome
 // e chama a Instagram Messaging API de verdade (ver worker/src/index.ts).
 export const manualSendQueue = new Queue("manual-sends", { connection, defaultJobOptions: deliveryDefaults });
-

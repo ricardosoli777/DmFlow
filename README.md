@@ -264,4 +264,3 @@ DMFlow/
 
 Ver [`docs/07-plano-waves-spec-driven.md`](docs/07-plano-waves-spec-driven.md)
 pro estado detalhado de cada etapa.
-

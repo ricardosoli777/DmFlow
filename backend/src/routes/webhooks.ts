@@ -77,4 +77,3 @@ function isValidSignature(rawBody: Buffer, signatureHeader: string, appSecret: s
   const b = Buffer.from(signatureHeader);
   return a.length === b.length && timingSafeEqual(a, b);
 }
-

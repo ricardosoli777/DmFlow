@@ -83,6 +83,12 @@ const saveSchema = z.object({
   definition: flowDefinitionSchema,
 });
 
+const templateSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().max(280).optional().default(""),
+  definition: flowDefinitionSchema,
+});
+
 // RF04, RF10 — o grafo salvo aqui é exatamente o que o worker executa.
 export async function flowRoutes(app: FastifyInstance) {
   app.get("/flows", async (req) => {
@@ -140,6 +146,49 @@ export async function flowRoutes(app: FastifyInstance) {
       prisma.flow.delete({ where: { id } }),
     ]);
 
+    return reply.status(204).send();
+  });
+
+  app.get("/flow-templates", async (req) => {
+    return prisma.flowTemplate.findMany({ where: { workspaceId: req.workspaceId }, orderBy: { updatedAt: "desc" } });
+  });
+
+  app.get("/flow-templates/:id", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const template = await prisma.flowTemplate.findUnique({ where: { id } });
+    if (!template || template.workspaceId !== req.workspaceId) return reply.status(404).send({ error: "not found" });
+    return template;
+  });
+
+  app.post("/flow-templates", { preHandler: requireRole("OWNER", "ADMIN") }, async (req, reply) => {
+    const body = templateSchema.parse(req.body);
+    const template = await prisma.flowTemplate.create({
+      data: {
+        workspaceId: req.workspaceId,
+        name: body.name,
+        description: body.description,
+        definition: body.definition as Prisma.InputJsonValue,
+      },
+    });
+    return reply.status(201).send(template);
+  });
+
+  app.put("/flow-templates/:id", { preHandler: requireRole("OWNER", "ADMIN") }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const body = templateSchema.parse(req.body);
+    const existing = await prisma.flowTemplate.findUnique({ where: { id } });
+    if (!existing || existing.workspaceId !== req.workspaceId) return reply.status(404).send({ error: "not found" });
+    return prisma.flowTemplate.update({
+      where: { id },
+      data: { name: body.name, description: body.description, definition: body.definition as Prisma.InputJsonValue },
+    });
+  });
+
+  app.delete("/flow-templates/:id", { preHandler: requireRole("OWNER", "ADMIN") }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const existing = await prisma.flowTemplate.findUnique({ where: { id } });
+    if (!existing || existing.workspaceId !== req.workspaceId) return reply.status(404).send({ error: "not found" });
+    await prisma.flowTemplate.delete({ where: { id } });
     return reply.status(204).send();
   });
 }

@@ -65,4 +65,3 @@ export function decryptInstagramAccount(account: InstagramAccount): InstagramAcc
     pageAccessToken: decryptCredential(account.pageAccessToken),
   };
 }
-

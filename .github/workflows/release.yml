@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags: ["v*.*.*"]
-    branches: [main] # também publica :latest a cada merge na main
+    branches: [main]
 
 permissions:
   contents: read
@@ -32,7 +32,7 @@ jobs:
           images: ghcr.io/${{ github.repository_owner }}/dmflow-${{ matrix.service }}
           tags: |
             type=semver,pattern={{version}}
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-,format=short
 
       # NEXT_PUBLIC_* é gravado no bundle em build time (ver frontend/Dockerfile) —
       # só o frontend precisa; nos outros services o build-arg fica vazio/ignorado.

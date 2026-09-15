@@ -14,4 +14,3 @@ const deliveryDefaults = {
 // depois do tempo agendado. Produzida e consumida pelo próprio worker (ver
 // executor.ts e index.ts).
 export const flowResumeQueue = new Queue("flow-resume", { connection, defaultJobOptions: deliveryDefaults });
-

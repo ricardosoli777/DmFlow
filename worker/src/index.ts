@@ -109,4 +109,3 @@ flowResumeWorker.on("failed", (job, err) => {
 console.log(
   "DMFlow worker rodando — aguardando eventos nas filas instagram-events, manual-sends e flow-resume",
 );
-

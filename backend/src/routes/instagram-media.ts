@@ -43,4 +43,3 @@ export async function instagramMediaRoutes(app: FastifyInstance) {
     return { media: data.data ?? [] };
   });
 }
-
