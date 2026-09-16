@@ -1,7 +1,8 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookmarkPlus, CheckCircle2, XCircle } from "lucide-react";
+import { ArrowLeft, BookmarkPlus, CheckCircle2, XCircle } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { fromDefinition, toDefinition, type FlowDefinition } from "@/lib/flow-definition";
@@ -97,8 +98,11 @@ export default function FlowEditorPage({ params }: { params: { id: string } }) {
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col gap-4 -m-8">
+    <div className="flex h-screen flex-col gap-4">
       <div className="flex items-center justify-between gap-4 border-b border-border bg-card px-6 py-3">
+        <Link href="/flows" className="flex shrink-0 items-center gap-1 rounded px-2 py-1 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
+          <ArrowLeft size={16} /> Voltar
+        </Link>
         <input
           className="min-w-0 flex-1 rounded-[var(--radius)] border border-transparent bg-transparent px-2 py-1 text-lg font-semibold outline-none focus:border-border focus:bg-background"
           value={name}
