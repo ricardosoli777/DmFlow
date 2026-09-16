@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { getCurrentWorkspaceId } from "@/lib/api";
@@ -11,6 +11,7 @@ import { getCurrentWorkspaceId } from "@/lib/api";
 // de verdade, um guard simples evita telas quebradas cheias de "—".
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -24,10 +25,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (!ready) return null;
 
+  const isFlowEditor = /^\/flows\/[^/]+$/.test(pathname);
+
   return (
     <div className="flex">
-      <SidebarNav />
-      <main className="flex-1 overflow-y-auto p-8">{children}</main>
+      {!isFlowEditor && <SidebarNav />}
+      <main className={`flex-1 overflow-y-auto ${isFlowEditor ? "h-screen" : "p-8"}`}>{children}</main>
     </div>
   );
 }
