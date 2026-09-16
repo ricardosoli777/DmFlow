@@ -155,6 +155,11 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showTechnicalError, setShowTechnicalError] = useState(false);
+  const oauth = useMutation({
+    mutationFn: () => api.get<{ url: string }>(`/oauth/meta/start?accountId=${encodeURIComponent(account.id)}`),
+    onSuccess: ({ url }) => { window.location.href = url; },
+    onError: (err: unknown) => setSaveError(err instanceof Error ? err.message : "Não foi possível iniciar o OAuth."),
+  });
 
   const save = useMutation({
     mutationFn: (body: Partial<FormState>) => api.put<InstagramAccountStatus>(`/instagram-accounts/${account.id}`, body),
@@ -244,6 +249,9 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
           </a>
           .
         </p>
+        <Button type="button" variant="secondary" onClick={() => oauth.mutate()} disabled={oauth.isPending}>
+          {oauth.isPending ? "Abrindo Meta..." : "Conectar com Meta/Instagram (OAuth)"}
+        </Button>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field

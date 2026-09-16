@@ -33,24 +33,61 @@ nenhum. Caminhos exatos, na ordem:
    própria tela da Meta (conectar a conta Instagram Business, gerar token,
    configurar webhooks) — siga por ele, os IDs abaixo aparecem nesse fluxo.
 
-### 4. Gerar o token de acesso → campo **Token de acesso da página**
+### 4. Gerar o **Page Access Token** (é este valor que vai no app)
 
-1. Ainda em **Instagram API setup**, na etapa **"Generate access tokens"**,
-   clique em **Gerar token** pra sua conta.
-2. Esse token gerado ali já é de longa duração (~60 dias) — copie o valor
-   inteiro e cole no campo **Token de acesso da página** em Configurações.
-   - Alternativa (mais controle): **Ferramentas → Graph API Explorer** →
-     selecione o app → selecione a Página → marque as permissões da seção
-     abaixo → **Gerar token de acesso**. Tokens gerados assim são
-     short-lived; troque por um de longa duração em
-     **Configurações do app → Avançado → Ferramenta de depuração de
-     token** (cole o token curto e peça pra "estender").
+O DMFlow precisa do token da **Página do Facebook vinculada ao Instagram**.
+Não cole aqui o App Secret, um token de usuário comum ou o token de teste do
+Instagram. O token correto aparece na resposta de `/me/accounts` como
+`access_token` da Página.
+
+#### Teste rápido (Development)
+
+O token gerado diretamente no Graph API Explorer é adequado para teste e
+normalmente expira. Ele pode validar a conexão, mas não deve ser tratado como
+credencial permanente de produção.
+
+1. Abra o [Graph API Explorer](https://developers.facebook.com/tools/explorer/)
+   e, no seletor no canto superior direito, escolha **o seu app** (não
+   “Graph API Explorer” genérico).
+2. Clique **Generate Access Token / Gerar token** → **User Token** e autorize
+   as permissões solicitadas para a Página e para mensagens/comentários
+   (`pages_show_list`, `pages_read_engagement`, `pages_manage_metadata`,
+   `instagram_basic`, `instagram_manage_comments` e
+   `instagram_manage_messages`). Em modo Development, sua conta precisa estar
+   como administradora/testadora do app.
+3. No campo de requisição, selecione **GET** e execute:
+   ` /me/accounts?fields=id,name,access_token,instagram_business_account `
+4. Localize a Página que está vinculada ao seu Instagram. Copie **somente o
+   valor de `access_token` dentro desse objeto de Página** (não copie o token
+   do topo nem o `instagram_business_account.id`). Esse é o **Page Access
+   Token**.
+5. Cole o valor inteiro em **Configurações → Token de acesso da página** no
+   DMFlow e salve. O app valida o token contra a Graph API antes de gravá-lo;
+   depois ele fica cifrado no banco de dados.
+
+Para conferir antes de salvar, execute no Explorer (substituindo os valores):
+`GET /SEU_IG_USER_ID?fields=id,username&access_token=SEU_PAGE_ACCESS_TOKEN`.
+Uma resposta JSON com `id` e `username` confirma que o token pertence à conta
+certa. Se aparecer **Invalid OAuth access token (code 190)**, gere outro token,
+confirme que escolheu a Página correta e que o Instagram é Business/Creator.
+
+#### Produção
+
+Para produção, gere primeiro um **User Access Token de longa duração** pelo
+fluxo de Login da Meta do seu app (ou estenda o token de teste pelo
+[Access Token Debugger](https://developers.facebook.com/tools/debug/accesstoken/)
+quando a Meta oferecer essa opção). Em seguida, repita `/me/accounts` usando
+esse User Token e copie o `access_token` da Página novamente. Esse é o Page
+Access Token usado pelo DMFlow. Tokens têm validade e precisam ser renovados;
+não existe garantia de token permanente. Se o app atender pessoas que não são
+administradores/testadores, publique-o em **Live** e conclua o App Review das
+permissões de mensagens/comentários antes de conectar clientes.
 
 ### 5. Descobrir o Instagram Business Account ID → campo **ID da conta Instagram**
 
-1. Em **Ferramentas → Graph API Explorer**, com o token gerado no passo 4:
-2. Rode: `GET /me/accounts?fields=instagram_business_account`
-3. Na resposta JSON, dentro da página certa, o campo
+1. No **Graph API Explorer**, com o token de usuário gerado no passo 4, rode:
+   `GET /me/accounts?fields=id,name,instagram_business_account`
+2. Na resposta JSON, dentro da página certa, o campo
    `instagram_business_account.id` é o valor a colar no campo **ID da conta
    Instagram** em Configurações (é um número longo, não confundir com o
    `@usuário`).

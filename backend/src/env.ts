@@ -13,6 +13,9 @@ const schema = z.object({
   // RNF10 — base pública do dashboard, usada pra montar o link de login por
   // e-mail (`{PUBLIC_APP_URL}/login/verify?token=...`).
   PUBLIC_APP_URL: z.string().default("http://localhost:3000"),
+  META_OAUTH_APP_ID: z.string().default(""),
+  META_OAUTH_APP_SECRET: z.string().default(""),
+  META_OAUTH_REDIRECT_URI: z.string().default("http://localhost:4000/oauth/meta/callback"),
   // Envio de e-mail do magic-link — duas opções, nessa ordem de prioridade
   // (ver backend/src/lib/email.ts e README.md "Login por e-mail"):
   // 1. Resend (RESEND_API_KEY) — recomendado, precisa de domínio verificado.

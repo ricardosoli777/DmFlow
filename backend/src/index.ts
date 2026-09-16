@@ -12,6 +12,7 @@ import { instagramMediaRoutes } from "./routes/instagram-media";
 import { linkRedirectRoutes } from "./routes/link-redirect";
 import { messageRoutes } from "./routes/messages";
 import { metricsRoutes } from "./routes/metrics";
+import { metaOAuthCallbackRoutes, metaOAuthStartRoutes } from "./routes/meta-oauth";
 import { trackedLinkRoutes } from "./routes/tracked-links";
 import { triggerRoutes } from "./routes/triggers";
 import { webhookRoutes } from "./routes/webhooks";
@@ -44,6 +45,7 @@ async function bootstrap() {
   await app.register(webhookRoutes);
   await app.register(authRoutes);
   await app.register(linkRedirectRoutes);
+  await app.register(metaOAuthCallbackRoutes);
 
   // RF16/RNF10 — tudo daqui pra baixo exige JWT válido + membership no
   // workspace informado em X-Workspace-Id (achado: antes desta wave NENHUMA
@@ -58,6 +60,7 @@ async function bootstrap() {
     await protectedApp.register(messageRoutes);
     await protectedApp.register(metricsRoutes);
     await protectedApp.register(instagramAccountRoutes);
+    await protectedApp.register(metaOAuthStartRoutes);
     await protectedApp.register(instagramMediaRoutes);
     await protectedApp.register(trackedLinkRoutes);
   });

@@ -119,9 +119,17 @@ Resumo:
 | Campo em Configurações | Onde pegar |
 |---|---|
 | **App ID** / **App Secret** | developers.facebook.com/apps → seu app → **Configurações do app → Básico** |
-| **Token de acesso da página** | Dentro do app → **Adicionar produto → Instagram → Instagram API setup** → etapa "Generate access tokens" |
+| **Token de acesso da página** | Graph API Explorer → `GET /me/accounts?fields=id,name,access_token,instagram_business_account` → copie o `access_token` da Página vinculada (não o token de usuário) |
 | **ID da conta Instagram** | **Ferramentas → Graph API Explorer** → `GET /me/accounts?fields=instagram_business_account` |
 | **Token de verificação do webhook** | Você mesmo inventa (senha aleatória) — usa o mesmo valor ao configurar o Webhook no app |
+
+> Importante: o **Page Access Token** é o `access_token` dentro do objeto da
+> Página retornado por `/me/accounts`. O DMFlow valida o token antes de salvar
+> e o armazena cifrado. O token direto do Graph API Explorer serve para teste;
+> em produção use um User Token de longa duração, gere novamente o Page Token
+> e renove-o quando expirar. Se a Meta retornar erro 190, gere/estenda o token
+> e confirme que ele pertence à Página ligada ao Instagram. O passo a passo
+> completo está em [`docs/04-integracao-meta.md`](docs/04-integracao-meta.md).
 
 Antes de tudo isso: a conta Instagram precisa ser **Business** e estar
 vinculada a uma **Página do Facebook** (Instagram → Configurações → Contas
