@@ -84,6 +84,9 @@ services:
       GMAIL_USER: ${GMAIL_USER}
       GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD}
       EMAIL_FROM: ${EMAIL_FROM}
+      META_OAUTH_APP_ID: ${META_OAUTH_APP_ID}
+      META_OAUTH_APP_SECRET: ${META_OAUTH_APP_SECRET}
+      META_OAUTH_REDIRECT_URI: ${META_OAUTH_REDIRECT_URI}
     networks:
       - dmflow_internal
       - Arkitekt
