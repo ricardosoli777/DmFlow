@@ -157,7 +157,7 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
   const [showTechnicalError, setShowTechnicalError] = useState(false);
   const oauth = useMutation({
     mutationFn: () => api.get<{ url: string }>(`/oauth/meta/start?accountId=${encodeURIComponent(account.id)}`),
-    onSuccess: ({ url }) => { window.location.href = url; },
+    onSuccess: ({ url }) => { window.open(url, "_blank", "noopener,noreferrer"); },
     onError: (err: unknown) => setSaveError(err instanceof Error ? err.message : "Não foi possível iniciar o OAuth."),
   });
 
@@ -236,19 +236,6 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
 
         <hr className="border-border" />
 
-        <p className="text-sm text-muted-foreground">
-          Preencha os campos abaixo, na ordem, pra conectar (ou trocar) essa conta — cada um tem um botão que já
-          abre a tela certa da Meta. Deixe em branco o que você não quer alterar. Guia completo em{" "}
-          <a
-            href="https://github.com/ricardosoli777/DmFlow/blob/main/docs/04-integracao-meta.md"
-            target="_blank"
-            rel="noreferrer"
-            className="text-primary underline"
-          >
-            docs/04-integracao-meta.md
-          </a>
-          .
-        </p>
         <Button type="button" variant="secondary" onClick={() => oauth.mutate()} disabled={oauth.isPending}>
           {oauth.isPending ? "Abrindo Meta..." : "Conectar com Meta/Instagram (OAuth)"}
         </Button>
