@@ -15,7 +15,7 @@ export async function metaOAuthStartRoutes(app: FastifyInstance) {
     const account = accountId ? await getInstagramAccount(accountId) : null;
     if (!account || account.workspaceId !== req.workspaceId) return reply.status(400).send({ error: "Conta Instagram inválida" });
     const state = app.jwt.sign({ workspaceId: req.workspaceId, userId: req.userId, accountId }, { expiresIn: "10m" });
-    const params = new URLSearchParams({ client_id: env.META_OAUTH_APP_ID, redirect_uri: env.META_OAUTH_REDIRECT_URI, state, response_type: "code", scope: "pages_show_list,pages_read_engagement,pages_manage_metadata,instagram_basic,instagram_manage_comments,instagram_manage_messages" });
+    const params = new URLSearchParams({ client_id: env.META_OAUTH_APP_ID, redirect_uri: env.META_OAUTH_REDIRECT_URI, state, response_type: "code", scope: "pages_show_list,pages_read_engagement,instagram_basic,instagram_manage_comments,instagram_manage_messages" });
     return { url: `https://www.facebook.com/v21.0/dialog/oauth?${params}` };
   });
 }

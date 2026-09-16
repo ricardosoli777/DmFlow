@@ -51,8 +51,8 @@ credencial permanente de produção.
    “Graph API Explorer” genérico).
 2. Clique **Generate Access Token / Gerar token** → **User Token** e autorize
    as permissões solicitadas para a Página e para mensagens/comentários
-   (`pages_show_list`, `pages_read_engagement`, `pages_manage_metadata`,
-   `instagram_basic`, `instagram_manage_comments` e
+   (`pages_show_list`, `pages_read_engagement`, `instagram_basic`,
+   `instagram_manage_comments` e
    `instagram_manage_messages`). Em modo Development, sua conta precisa estar
    como administradora/testadora do app.
 3. No campo de requisição, selecione **GET** e execute:
@@ -160,7 +160,6 @@ já pré-seleciona certo, isso aqui é só referência).
 | `instagram_manage_messages` | Obrigatória — envio/recebimento de DM (RF03) |
 | `pages_show_list` | Listar as Páginas da sua conta, pra achar a que tem o Instagram vinculado |
 | `pages_read_engagement` | Ler engajamento da Página (comentários passam por aqui nesse fluxo) |
-| `pages_manage_metadata` | Assinar webhooks via API — a Meta às vezes exige mesmo configurando pela UI |
 
 **Não precisa (pode desmarcar se a Meta oferecer):** `instagram_content_publish`
 / `instagram_business_content_publish` (publicação de posts), e qualquer
