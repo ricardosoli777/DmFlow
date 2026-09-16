@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Play, Trash2 } from "lucide-react";
+import { Eye, Pencil, Play, Save, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,10 @@ export default function FlowsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [viewingTemplateId, setViewingTemplateId] = useState<string | null>(null);
+  const [templateName, setTemplateName] = useState("");
+  const [templateDescription, setTemplateDescription] = useState("");
 
   const { data: flows } = useQuery({
     queryKey: ["flows"],
@@ -50,6 +54,18 @@ export default function FlowsPage() {
   const deleteTemplate = useMutation({
     mutationFn: (id: string) => api.delete(`/flow-templates/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["flow-templates"] }),
+  });
+  const saveTemplate = useMutation({
+    mutationFn: (template: SavedTemplate) =>
+      api.put(`/flow-templates/${template.id}`, {
+        name: templateName.trim() || template.name,
+        description: templateDescription,
+        definition: template.definition,
+      }),
+    onSuccess: () => {
+      setEditingTemplateId(null);
+      queryClient.invalidateQueries({ queryKey: ["flow-templates"] });
+    },
   });
 
   const createFlowFromSavedTemplate = useMutation({
@@ -100,14 +116,34 @@ export default function FlowsPage() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {savedTemplates.map((template) => (
               <Card key={template.id} className="p-4">
-                <p className="font-medium">{template.name}</p>
-                <p className="mt-1 min-h-10 text-xs text-muted-foreground">
-                  {template.description || `${template.definition.nodes.length} nodes`}
-                </p>
+                {editingTemplateId === template.id ? (
+                  <div className="flex flex-col gap-2">
+                    <input className="rounded border border-border bg-background p-2 text-sm" value={templateName} onChange={(event) => setTemplateName(event.target.value)} />
+                    <textarea className="rounded border border-border bg-background p-2 text-sm" placeholder="Descrição" value={templateDescription} onChange={(event) => setTemplateDescription(event.target.value)} />
+                  </div>
+                ) : <><p className="font-medium">{template.name}</p><p className="mt-1 min-h-10 text-xs text-muted-foreground">{template.description || `${template.definition.nodes.length} nodes`}</p></>}
+                {viewingTemplateId === template.id && (
+                  <div className="mt-2 rounded border border-border bg-muted/40 p-2 text-xs text-muted-foreground">
+                    <p>{template.definition.nodes.length} nodes · início: {template.definition.start}</p>
+                    <p className="mt-1">{template.definition.nodes.map((node) => node.type).join(" → ")}</p>
+                  </div>
+                )}
                 <div className="mt-3 flex gap-2">
                   <Button size="sm" onClick={() => createFlowFromSavedTemplate.mutate(template)} disabled={createFlowFromSavedTemplate.isPending}>
                     <Play size={14} /> Usar e editar
                   </Button>
+                  <Button size="sm" variant="secondary" onClick={() => setViewingTemplateId(viewingTemplateId === template.id ? null : template.id)} aria-label={`Visualizar template ${template.name}`}>
+                    <Eye size={14} />
+                  </Button>
+                  {editingTemplateId === template.id ? (
+                    <Button size="sm" variant="secondary" onClick={() => saveTemplate.mutate(template)} disabled={saveTemplate.isPending} aria-label={`Salvar template ${template.name}`}>
+                      <Save size={14} />
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="secondary" onClick={() => { setEditingTemplateId(template.id); setTemplateName(template.name); setTemplateDescription(template.description); }} aria-label={`Editar template ${template.name}`}>
+                      <Pencil size={14} />
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="secondary"
@@ -144,6 +180,7 @@ export default function FlowsPage() {
               </CardHeader>
               <CardContent className="text-xs text-muted-foreground">
                 Atualizado em {new Date(flow.updatedAt).toLocaleDateString("pt-BR")}
+                <span className="mt-2 block">Clique para visualizar e editar</span>
               </CardContent>
             </Card>
           </Link>
