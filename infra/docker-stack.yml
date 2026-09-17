@@ -78,15 +78,20 @@ services:
       REDIS_URL: redis://dmflow-redis:6379
       JWT_SECRET: ${JWT_SECRET}
       META_CREDENTIALS_ENCRYPTION_KEY: ${META_CREDENTIALS_ENCRYPTION_KEY}
+      # OAuth pessoal: valores ficam exclusivamente no .env da VPS.
+      # META_OAUTH_APP_* pode ficar vazio e reutiliza META_APP_* no backend.
+      META_APP_ID: ${META_APP_ID}
+      META_APP_SECRET: ${META_APP_SECRET}
+      META_OAUTH_APP_ID: ${META_OAUTH_APP_ID}
+      META_OAUTH_APP_SECRET: ${META_OAUTH_APP_SECRET}
+      META_OAUTH_REDIRECT_URI: ${META_OAUTH_REDIRECT_URI}
+      META_OAUTH_PAGE_ID: ${META_OAUTH_PAGE_ID}
       PUBLIC_API_URL: https://hooks.arkitekt.space
       PUBLIC_APP_URL: https://dmflow.arkitekt.space
       RESEND_API_KEY: ${RESEND_API_KEY}
       GMAIL_USER: ${GMAIL_USER}
       GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD}
       EMAIL_FROM: ${EMAIL_FROM}
-      META_OAUTH_APP_ID: ${META_OAUTH_APP_ID}
-      META_OAUTH_APP_SECRET: ${META_OAUTH_APP_SECRET}
-      META_OAUTH_REDIRECT_URI: ${META_OAUTH_REDIRECT_URI}
     networks:
       - dmflow_internal
       - Arkitekt
