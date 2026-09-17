@@ -240,6 +240,20 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
           {oauth.isPending ? "Abrindo Meta..." : "Conectar com Meta/Instagram (OAuth)"}
         </Button>
 
+        <p className="text-sm text-muted-foreground">
+          Preencha os campos abaixo, na ordem, pra conectar (ou trocar) essa conta — cada um tem um botão que já
+          abre a tela certa da Meta. Deixe em branco o que você não quer alterar. Guia completo em{" "}
+          <a
+            href="https://github.com/ricardosoli777/DmFlow/blob/main/docs/04-integracao-meta.md"
+            target="_blank"
+            rel="noreferrer"
+            className="text-primary underline"
+          >
+            docs/04-integracao-meta.md
+          </a>
+          .
+        </p>
+
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field
             fieldKey="appId"

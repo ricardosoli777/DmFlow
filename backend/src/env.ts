@@ -13,9 +13,18 @@ const schema = z.object({
   // RNF10 — base pública do dashboard, usada pra montar o link de login por
   // e-mail (`{PUBLIC_APP_URL}/login/verify?token=...`).
   PUBLIC_APP_URL: z.string().default("http://localhost:3000"),
+  // OAuth de uso pessoal da Meta. META_OAUTH_PAGE_ID é opcional: quando a
+  // Meta omite uma Página em /me/accounts, permite buscar diretamente a
+  // Página que o proprietário escolheu no Business Suite.
+  // Os nomes META_APP_* são mantidos por compatibilidade com instalações
+  // existentes. Os META_OAUTH_* permitem sobrescrever somente quando o
+  // login usar outro app da Meta.
+  META_APP_ID: z.string().default(""),
+  META_APP_SECRET: z.string().default(""),
   META_OAUTH_APP_ID: z.string().default(""),
   META_OAUTH_APP_SECRET: z.string().default(""),
-  META_OAUTH_REDIRECT_URI: z.string().default("http://localhost:4000/oauth/meta/callback"),
+  META_OAUTH_REDIRECT_URI: z.string().url().or(z.literal("")).default(""),
+  META_OAUTH_PAGE_ID: z.string().regex(/^\d*$/).default(""),
   // Envio de e-mail do magic-link — duas opções, nessa ordem de prioridade
   // (ver backend/src/lib/email.ts e README.md "Login por e-mail"):
   // 1. Resend (RESEND_API_KEY) — recomendado, precisa de domínio verificado.
@@ -30,4 +39,11 @@ const schema = z.object({
   EMAIL_FROM: z.string().default("DMFlow <login@dmflow.example.com>"),
 });
 
-export const env = schema.parse(process.env);
+const configured = schema.parse(process.env);
+
+export const env = {
+  ...configured,
+  META_OAUTH_APP_ID: configured.META_OAUTH_APP_ID || configured.META_APP_ID,
+  META_OAUTH_APP_SECRET: configured.META_OAUTH_APP_SECRET || configured.META_APP_SECRET,
+  META_OAUTH_REDIRECT_URI: configured.META_OAUTH_REDIRECT_URI || `${configured.PUBLIC_API_URL}/oauth/meta/callback`,
+};
