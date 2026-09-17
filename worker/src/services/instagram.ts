@@ -240,7 +240,7 @@ export async function fetchInstagramProfile(
 
   try {
     const res = await fetch(
-      `https://graph.instagram.com/${account.graphApiVersion}/${igsid}?fields=name,username,profile_pic&access_token=${account.pageAccessToken}`,
+      `https://graph.facebook.com/${account.graphApiVersion}/${igsid}?fields=name,username,profile_pic&access_token=${account.pageAccessToken}`,
     );
     const data = (await res.json()) as {
       name?: string;
@@ -292,7 +292,7 @@ export async function checkFollowStatus(account: InstagramAccount, igsid: string
 
   try {
     const res = await fetch(
-      `https://graph.instagram.com/${account.graphApiVersion}/${igsid}?fields=is_user_follow_business&access_token=${account.pageAccessToken}`,
+      `https://graph.facebook.com/${account.graphApiVersion}/${igsid}?fields=is_user_follow_business&access_token=${account.pageAccessToken}`,
     );
     const data = (await res.json()) as { is_user_follow_business?: boolean; error?: { message?: string } };
     if (!res.ok || data.error || data.is_user_follow_business === undefined) {
@@ -334,12 +334,12 @@ async function callSend(account: InstagramAccount, igsid: string, message: Recor
 
 async function callGraphApi(account: InstagramAccount, path: string, body: Record<string, unknown>): Promise<void> {
   if (!account.pageAccessToken) {
-    console.log(`[dev sem token] POST graph.instagram.com/${account.graphApiVersion}${path}`, body);
+    console.log(`[dev sem token] POST graph.facebook.com/${account.graphApiVersion}${path}`, body);
     return;
   }
 
   const res = await fetch(
-    `https://graph.instagram.com/${account.graphApiVersion}${path}?access_token=${account.pageAccessToken}`,
+    `https://graph.facebook.com/${account.graphApiVersion}${path}?access_token=${account.pageAccessToken}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },

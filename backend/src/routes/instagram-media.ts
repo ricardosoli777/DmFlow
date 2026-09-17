@@ -31,7 +31,7 @@ export async function instagramMediaRoutes(app: FastifyInstance) {
     }
 
     const fields = "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp";
-    const url = `https://graph.instagram.com/${account.graphApiVersion}/${account.igUserId}/media?fields=${fields}&limit=50&access_token=${account.pageAccessToken}`;
+    const url = `https://graph.facebook.com/${account.graphApiVersion}/${account.igUserId}/media?fields=${fields}&limit=50&access_token=${account.pageAccessToken}`;
 
     const res = await fetch(url);
     const data = (await res.json()) as { data?: IgMedia[]; error?: { message?: string } };
