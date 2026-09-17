@@ -21,7 +21,7 @@ export async function metaOAuthStartRoutes(app: FastifyInstance) {
       redirect_uri: env.META_OAUTH_REDIRECT_URI,
       state,
       response_type: "code",
-      scope: "pages_show_list,pages_read_engagement,pages_manage_metadata,instagram_basic,instagram_manage_comments,instagram_manage_messages",
+      scope: "pages_show_list,pages_read_engagement,instagram_basic,instagram_manage_comments,instagram_manage_messages",
     });
     return { url: `https://www.facebook.com/v21.0/dialog/oauth?${params}` };
   });
