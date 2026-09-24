@@ -39,7 +39,7 @@ export async function zernioRoutes(app: FastifyInstance) {
     }
     const state = app.jwt.sign({ workspaceId: req.workspaceId, userId: req.userId, profileId }, { expiresIn: "10m" });
     const redirect = `${env.PUBLIC_API_URL}/oauth/zernio/callback?state=${encodeURIComponent(state)}`;
-    const params = new URLSearchParams({ profileId, redirect_url: redirect, loginMethod: "facebook_login" });
+    const params = new URLSearchParams({ profileId, redirect_url: redirect });
     const result = await zernio<{ data?: { authUrl: string }; authUrl?: string }>(`/connect/instagram?${params}`);
     const authUrl = result.authUrl ?? result.data?.authUrl;
     if (!authUrl) return reply.status(502).send({ error: "Zernio não retornou URL de conexão" });
