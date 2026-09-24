@@ -274,7 +274,7 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
                 <Button
                   key={zernioAccount.accountId}
                   type="button"
-                  variant={zernioConnectedAccountId === zernioAccount.accountId ? "default" : "outline"}
+                  variant={zernioConnectedAccountId === zernioAccount.accountId ? "primary" : "secondary"}
                   onClick={() => selectZernio.mutate(zernioAccount.accountId)}
                   disabled={selectZernio.isPending}
                 >
