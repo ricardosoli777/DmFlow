@@ -87,7 +87,7 @@ export async function checkInstagramConnection(
   }
 
   try {
-    const res = await fetch(`https://graph.facebook.com/${version}/${igUserId}?fields=id,username&access_token=${token}`);
+    const res = await fetch(`https://graph.facebook.com/${version}/${igUserId}?fields=id,username&access_token=${encodeURIComponent(token)}`);
     const data = (await res.json()) as { username?: string; error?: { message?: string } };
 
     if (!res.ok || data.error) {

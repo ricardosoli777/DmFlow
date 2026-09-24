@@ -45,6 +45,9 @@ export async function metaOAuthCallbackRoutes(app: FastifyInstance) {
         appSecret: env.META_OAUTH_APP_SECRET,
         pageAccessToken: page.access_token,
         igUserId: page.instagram_business_account.id,
+        igUsername: page.instagram_business_account.username ?? "",
+        // OAuth não fornece o verify token do webhook; preserva o já configurado.
+        verifyToken: account.verifyToken,
         graphApiVersion: "v21.0",
       });
       return redirect(true);
