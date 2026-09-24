@@ -5,6 +5,12 @@ import { requireAuth, requireRole } from "../lib/auth";
 import { prisma } from "../lib/prisma";
 
 const connectResponse = z.object({ authUrl: z.string().url() });
+type ZernioAccount = { _id: string; platform: string; username?: string; profileId?: string | { _id: string } };
+
+function instagramAccount(account: ZernioAccount) {
+  const profileId = typeof account.profileId === "string" ? account.profileId : account.profileId?._id;
+  return { accountId: account._id, profileId, username: account.username ?? "", platform: account.platform };
+}
 
 async function zernio<T>(path: string, init?: RequestInit): Promise<T> {
   if (!env.ZERNIO_API_KEY) throw new Error("Zernio não configurado no servidor");
@@ -23,23 +29,37 @@ export async function zernioRoutes(app: FastifyInstance) {
     return connection ? { connected: true, accountId: connection.accountId, username: connection.username, profileId: connection.profileId } : { connected: false };
   });
 
+  app.get("/zernio-accounts", { preHandler: [requireAuth, requireRole("OWNER", "ADMIN")] }, async (req, reply) => {
+    if (!env.ZERNIO_API_KEY) return reply.status(503).send({ error: "Zernio não configurado no servidor" });
+    const available = await zernio<{ accounts?: ZernioAccount[] }>("/accounts");
+    const current = await prisma.zernioConnection.findUnique({ where: { workspaceId: req.workspaceId } });
+    return {
+      accounts: (available.accounts ?? []).filter((account) => account.platform === "instagram").map(instagramAccount),
+      connectedAccountId: current?.accountId ?? null,
+    };
+  });
+
+  app.post("/zernio-accounts/select", { preHandler: [requireAuth, requireRole("OWNER", "ADMIN")] }, async (req, reply) => {
+    if (!env.ZERNIO_API_KEY) return reply.status(503).send({ error: "Zernio não configurado no servidor" });
+    const body = z.object({ accountId: z.string().min(1) }).parse(req.body);
+    const available = await zernio<{ accounts?: ZernioAccount[] }>("/accounts");
+    const account = (available.accounts ?? []).find((item) => item._id === body.accountId && item.platform === "instagram");
+    if (!account) return reply.status(404).send({ error: "Conta Instagram não encontrada no Zernio" });
+    const selected = instagramAccount(account);
+    if (!selected.profileId) return reply.status(422).send({ error: "Essa conta do Zernio não possui um perfil válido" });
+    await prisma.zernioConnection.upsert({
+      where: { workspaceId: req.workspaceId },
+      update: { profileId: selected.profileId, accountId: selected.accountId, username: selected.username },
+      create: { workspaceId: req.workspaceId, profileId: selected.profileId, accountId: selected.accountId, username: selected.username },
+    });
+    return { connected: true, accountId: selected.accountId, username: selected.username };
+  });
+
   app.get("/oauth/zernio/start", { preHandler: [requireAuth, requireRole("OWNER", "ADMIN")] }, async (req, reply) => {
     if (!env.ZERNIO_API_KEY) return reply.status(503).send({ error: "Zernio não configurado no servidor" });
     const workspace = await prisma.workspace.findUniqueOrThrow({ where: { id: req.workspaceId } });
-    const available = await zernio<{ accounts?: Array<{ _id: string; platform: string; username?: string; profileId?: string | { _id: string } }> }>("/accounts");
+    const available = await zernio<{ accounts?: ZernioAccount[] }>("/accounts");
     const instagramAccounts = (available.accounts ?? []).filter((account) => account.platform === "instagram");
-    if (instagramAccounts.length === 1) {
-      const account = instagramAccounts[0];
-      const zernioProfileId = typeof account.profileId === "string" ? account.profileId : account.profileId?._id;
-      if (zernioProfileId) {
-        await prisma.zernioConnection.upsert({
-          where: { workspaceId: req.workspaceId },
-          update: { profileId: zernioProfileId, accountId: account._id, username: account.username ?? "" },
-          create: { workspaceId: req.workspaceId, profileId: zernioProfileId, accountId: account._id, username: account.username ?? "" },
-        });
-        return { connected: true, username: account.username ?? "" };
-      }
-    }
     let connection = await prisma.zernioConnection.findUnique({ where: { workspaceId: req.workspaceId } });
     let profileId = connection?.profileId;
     if (!profileId) {

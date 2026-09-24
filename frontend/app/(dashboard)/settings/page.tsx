@@ -155,15 +155,28 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showTechnicalError, setShowTechnicalError] = useState(false);
+  const [zernioAccounts, setZernioAccounts] = useState<Array<{ accountId: string; username: string; profileId?: string }>>([]);
+  const [zernioConnectedAccountId, setZernioConnectedAccountId] = useState<string | null>(null);
   const zernio = useMutation({
-    mutationFn: () => api.get<{ authUrl?: string; connected?: boolean; username?: string }>("/oauth/zernio/start"),
-    onSuccess: ({ authUrl, connected, username }) => {
-      if (connected) { setSaveError(`Zernio conectado como @${username ?? ""}`); return; }
-      if (authUrl) window.location.assign(authUrl);
+    mutationFn: () => api.get<{ accounts: Array<{ accountId: string; username: string; profileId?: string }>; connectedAccountId: string | null }>("/zernio-accounts"),
+    onSuccess: ({ accounts, connectedAccountId }) => {
+      setZernioAccounts(accounts);
+      setZernioConnectedAccountId(connectedAccountId);
+      if (!accounts.length) setSaveError("Nenhuma conta Instagram conectada no Zernio ainda.");
     },
-    onError: (err: unknown) => setSaveError(err instanceof Error ? err.message : "Não foi possível iniciar o Zernio."),
+    onError: (err: unknown) => setSaveError(err instanceof Error ? err.message : "Não foi possível consultar as contas do Zernio."),
   });
 
+  const selectZernio = useMutation({
+    mutationFn: (accountId: string) => api.post<{ connected: boolean; accountId: string; username?: string }>("/zernio-accounts/select", { accountId }),
+    onSuccess: ({ accountId, username }) => {
+      setZernioConnectedAccountId(accountId);
+      setSaveError("Zernio conectado como @" + (username ?? ""));
+      setZernioAccounts([]);
+      queryClient.invalidateQueries({ queryKey: ["instagram-accounts"] });
+    },
+    onError: (err: unknown) => setSaveError(err instanceof Error ? err.message : "Não foi possível vincular a conta do Zernio."),
+  });
   const oauth = useMutation({
     mutationFn: () => api.get<{ url: string }>(`/oauth/meta/start?accountId=${encodeURIComponent(account.id)}`),
     onSuccess: ({ url }) => { window.open(url, "_blank", "noopener,noreferrer"); },
@@ -250,8 +263,27 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
         </Button>
 
         <Button type="button" variant="secondary" onClick={() => zernio.mutate()} disabled={zernio.isPending}>
-          {zernio.isPending ? "Abrindo Zernio..." : "Conectar via Zernio (alternativa)"}
+          {zernio.isPending ? "Consultando Zernio..." : "Conectar via Zernio (alternativa)"}
         </Button>
+
+        {zernioAccounts.length > 0 && (
+          <div className="rounded-md border border-border bg-muted/30 p-3">
+            <p className="mb-2 text-sm font-medium">Escolha uma conta já conectada no Zernio:</p>
+            <div className="flex flex-col gap-2">
+              {zernioAccounts.map((zernioAccount) => (
+                <Button
+                  key={zernioAccount.accountId}
+                  type="button"
+                  variant={zernioConnectedAccountId === zernioAccount.accountId ? "default" : "outline"}
+                  onClick={() => selectZernio.mutate(zernioAccount.accountId)}
+                  disabled={selectZernio.isPending}
+                >
+                  @{zernioAccount.username || "conta sem usuário"}{zernioConnectedAccountId === zernioAccount.accountId ? " (conectada)" : ""}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <p className="text-sm text-muted-foreground">
           Preencha os campos abaixo, na ordem, pra conectar (ou trocar) essa conta — cada um tem um botão que já
