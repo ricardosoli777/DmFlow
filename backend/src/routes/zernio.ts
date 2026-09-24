@@ -29,8 +29,13 @@ export async function zernioRoutes(app: FastifyInstance) {
     let connection = await prisma.zernioConnection.findUnique({ where: { workspaceId: req.workspaceId } });
     let profileId = connection?.profileId;
     if (!profileId) {
-      const created = await zernio<{ profile: { _id: string } }>("/profiles", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: `DMFlow — ${workspace.name}` }) });
-      profileId = created.profile._id;
+      const listed = await zernio<{ profiles?: Array<{ _id: string; name: string }> }>("/profiles");
+      const existing = listed.profiles?.find((profile) => profile.name === `DMFlow — ${workspace.name}`);
+      if (existing) profileId = existing._id;
+      else {
+        const created = await zernio<{ profile: { _id: string } }>("/profiles", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: `DMFlow — ${workspace.name}` }) });
+        profileId = created.profile._id;
+      }
     }
     const state = app.jwt.sign({ workspaceId: req.workspaceId, userId: req.userId, profileId }, { expiresIn: "10m" });
     const redirect = `${env.PUBLIC_API_URL}/oauth/zernio/callback?state=${encodeURIComponent(state)}`;
