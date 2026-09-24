@@ -157,7 +157,7 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
   const [showTechnicalError, setShowTechnicalError] = useState(false);
   const zernio = useMutation({
     mutationFn: () => api.get<{ authUrl: string }>("/oauth/zernio/start"),
-    onSuccess: ({ authUrl }) => { window.open(authUrl, "_blank", "noopener,noreferrer"); },
+    onSuccess: ({ authUrl }) => { window.location.assign(authUrl); },
     onError: (err: unknown) => setSaveError(err instanceof Error ? err.message : "Não foi possível iniciar o Zernio."),
   });
 
