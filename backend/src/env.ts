@@ -25,6 +25,7 @@ const schema = z.object({
   META_OAUTH_APP_SECRET: z.string().default(""),
   META_OAUTH_REDIRECT_URI: z.string().url().or(z.literal("")).default(""),
   META_OAUTH_PAGE_ID: z.string().regex(/^\d*$/).default(""),
+  ZERNIO_API_KEY: z.string().default(""),
   // Envio de e-mail do magic-link — duas opções, nessa ordem de prioridade
   // (ver backend/src/lib/email.ts e README.md "Login por e-mail"):
   // 1. Resend (RESEND_API_KEY) — recomendado, precisa de domínio verificado.
@@ -46,4 +47,5 @@ export const env = {
   META_OAUTH_APP_ID: configured.META_OAUTH_APP_ID || configured.META_APP_ID,
   META_OAUTH_APP_SECRET: configured.META_OAUTH_APP_SECRET || configured.META_APP_SECRET,
   META_OAUTH_REDIRECT_URI: configured.META_OAUTH_REDIRECT_URI || `${configured.PUBLIC_API_URL}/oauth/meta/callback`,
+  ZERNIO_API_KEY: configured.ZERNIO_API_KEY,
 };

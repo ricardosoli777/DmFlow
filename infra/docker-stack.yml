@@ -86,6 +86,7 @@ services:
       META_OAUTH_APP_SECRET: ${META_OAUTH_APP_SECRET}
       META_OAUTH_REDIRECT_URI: ${META_OAUTH_REDIRECT_URI}
       META_OAUTH_PAGE_ID: ${META_OAUTH_PAGE_ID}
+      ZERNIO_API_KEY: ${ZERNIO_API_KEY}
       PUBLIC_API_URL: https://hooks.arkitekt.space
       PUBLIC_APP_URL: https://dmflow.arkitekt.space
       RESEND_API_KEY: ${RESEND_API_KEY}

@@ -155,6 +155,12 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showTechnicalError, setShowTechnicalError] = useState(false);
+  const zernio = useMutation({
+    mutationFn: () => api.get<{ authUrl: string }>("/oauth/zernio/start"),
+    onSuccess: ({ authUrl }) => { window.open(authUrl, "_blank", "noopener,noreferrer"); },
+    onError: (err: unknown) => setSaveError(err instanceof Error ? err.message : "Não foi possível iniciar o Zernio."),
+  });
+
   const oauth = useMutation({
     mutationFn: () => api.get<{ url: string }>(`/oauth/meta/start?accountId=${encodeURIComponent(account.id)}`),
     onSuccess: ({ url }) => { window.open(url, "_blank", "noopener,noreferrer"); },
@@ -238,6 +244,10 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
 
         <Button type="button" variant="secondary" onClick={() => oauth.mutate()} disabled={oauth.isPending}>
           {oauth.isPending ? "Abrindo Meta..." : "Conectar com Meta/Instagram (OAuth)"}
+        </Button>
+
+        <Button type="button" variant="secondary" onClick={() => zernio.mutate()} disabled={zernio.isPending}>
+          {zernio.isPending ? "Abrindo Zernio..." : "Conectar via Zernio (alternativa)"}
         </Button>
 
         <p className="text-sm text-muted-foreground">

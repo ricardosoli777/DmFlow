@@ -17,6 +17,7 @@ import { trackedLinkRoutes } from "./routes/tracked-links";
 import { triggerRoutes } from "./routes/triggers";
 import { webhookRoutes } from "./routes/webhooks";
 import { workspaceRoutes } from "./routes/workspace";
+import { zernioRoutes } from "./routes/zernio";
 
 const app = Fastify({ logger: true });
 
@@ -46,6 +47,7 @@ async function bootstrap() {
   await app.register(authRoutes);
   await app.register(linkRedirectRoutes);
   await app.register(metaOAuthCallbackRoutes);
+  await app.register(zernioRoutes);
 
   // RF16/RNF10 — tudo daqui pra baixo exige JWT válido + membership no
   // workspace informado em X-Workspace-Id (achado: antes desta wave NENHUMA

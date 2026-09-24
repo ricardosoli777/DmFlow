@@ -40,6 +40,7 @@ model Workspace {
   members           WorkspaceMember[]
   invitations       WorkspaceInvitation[]
   instagramAccounts InstagramAccount[]
+  zernioConnection ZernioConnection?
   contacts          Contact[]
   flows             Flow[]
   flowTemplates     FlowTemplate[]
@@ -115,6 +116,20 @@ model InstagramAccount {
   @@map("instagram_accounts")
 }
 
+
+model ZernioConnection {
+  id          String    @id @default(uuid())
+  workspaceId String    @unique
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  profileId   String
+  accountId   String    @unique
+  username    String    @default("")
+  platform    String    @default("instagram")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("zernio_connections")
+}
 model Contact {
   id                 String            @id @default(uuid())
   workspaceId        String
