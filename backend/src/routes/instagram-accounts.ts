@@ -30,6 +30,7 @@ export async function instagramAccountRoutes(app: FastifyInstance) {
         hasVerifyToken: Boolean(a.verifyToken),
         hasPageAccessToken: Boolean(a.pageAccessToken),
         ...(await checkInstagramConnection(a.pageAccessToken, a.igUserId, a.graphApiVersion)),
+        ...(await prisma.zernioConnection.findFirst({ where: { instagramAccountId: a.id } }).then((connection) => connection ? { connected: true, username: connection.username, connectionMethod: "zernio" } : {})),
       })),
     );
     return withStatus;

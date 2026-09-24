@@ -112,6 +112,7 @@ model InstagramAccount {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   contacts        Contact[]
+  zernioConnection ZernioConnection?
 
   @@map("instagram_accounts")
 }
@@ -123,6 +124,8 @@ model ZernioConnection {
   workspace   Workspace @relation(fields: [workspaceId], references: [id])
   profileId   String
   accountId   String    @unique
+  instagramAccountId String?   @unique
+  instagramAccount   InstagramAccount? @relation(fields: [instagramAccountId], references: [id])
   username    String    @default("")
   platform    String    @default("instagram")
   createdAt   DateTime  @default(now())

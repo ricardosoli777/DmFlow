@@ -41,7 +41,9 @@ export async function zernioRoutes(app: FastifyInstance) {
 
   app.post("/zernio-accounts/select", { preHandler: [requireAuth, requireRole("OWNER", "ADMIN")] }, async (req, reply) => {
     if (!env.ZERNIO_API_KEY) return reply.status(503).send({ error: "Zernio não configurado no servidor" });
-    const body = z.object({ accountId: z.string().min(1) }).parse(req.body);
+    const body = z.object({ accountId: z.string().min(1), instagramAccountId: z.string().min(1) }).parse(req.body);
+    const targetAccount = await prisma.instagramAccount.findFirst({ where: { id: body.instagramAccountId, workspaceId: req.workspaceId } });
+    if (!targetAccount) return reply.status(404).send({ error: "Conta Instagram do DMFlow não encontrada" });
     const available = await zernio<{ accounts?: ZernioAccount[] }>("/accounts");
     const account = (available.accounts ?? []).find((item) => item._id === body.accountId && item.platform === "instagram");
     if (!account) return reply.status(404).send({ error: "Conta Instagram não encontrada no Zernio" });
@@ -49,8 +51,8 @@ export async function zernioRoutes(app: FastifyInstance) {
     if (!selected.profileId) return reply.status(422).send({ error: "Essa conta do Zernio não possui um perfil válido" });
     await prisma.zernioConnection.upsert({
       where: { workspaceId: req.workspaceId },
-      update: { profileId: selected.profileId, accountId: selected.accountId, username: selected.username },
-      create: { workspaceId: req.workspaceId, profileId: selected.profileId, accountId: selected.accountId, username: selected.username },
+      update: { profileId: selected.profileId, accountId: selected.accountId, instagramAccountId: body.instagramAccountId, username: selected.username },
+      create: { workspaceId: req.workspaceId, profileId: selected.profileId, accountId: selected.accountId, instagramAccountId: body.instagramAccountId, username: selected.username },
     });
     return { connected: true, accountId: selected.accountId, username: selected.username };
   });

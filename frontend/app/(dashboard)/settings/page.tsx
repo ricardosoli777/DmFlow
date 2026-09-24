@@ -94,6 +94,7 @@ type InstagramAccountStatus = {
   appId?: string;
   igUserId?: string;
   graphApiVersion?: string;
+  connectionMethod?: "meta" | "zernio";
   hasAppSecret?: boolean;
   hasVerifyToken?: boolean;
   hasPageAccessToken?: boolean;
@@ -168,7 +169,7 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
   });
 
   const selectZernio = useMutation({
-    mutationFn: (accountId: string) => api.post<{ connected: boolean; accountId: string; username?: string }>("/zernio-accounts/select", { accountId }),
+    mutationFn: (accountId: string) => api.post<{ connected: boolean; accountId: string; username?: string }>("/zernio-accounts/select", { accountId, instagramAccountId: account.id }),
     onSuccess: ({ accountId, username }) => {
       setZernioConnectedAccountId(accountId);
       setSaveError("Zernio conectado como @" + (username ?? ""));
@@ -237,7 +238,7 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
               <p className="text-sm font-medium">
                 Conectado como <span className="text-primary">@{account.username}</span>
               </p>
-              <p className="text-xs text-muted-foreground">IG User ID: {account.igUserId}</p>
+              <p className="text-xs text-muted-foreground">{account.connectionMethod === "zernio" ? "Conexão via Zernio" : `IG User ID: ${account.igUserId}`}</p>
             </div>
             <Badge variant="ativo" className="ml-auto">
               Conectado
@@ -258,9 +259,11 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
 
         <hr className="border-border" />
 
-        <Button type="button" variant="secondary" onClick={() => oauth.mutate()} disabled={oauth.isPending}>
-          {oauth.isPending ? "Abrindo Meta..." : "Conectar com Meta/Instagram (OAuth)"}
-        </Button>
+        {account.connectionMethod !== "zernio" && (
+          <Button type="button" variant="secondary" onClick={() => oauth.mutate()} disabled={oauth.isPending}>
+            {oauth.isPending ? "Abrindo Meta..." : "Conectar com Meta/Instagram (OAuth)"}
+          </Button>
+        )}
 
         <Button type="button" variant="secondary" onClick={() => zernio.mutate()} disabled={zernio.isPending}>
           {zernio.isPending ? "Consultando Zernio..." : "Conectar via Zernio (alternativa)"}
@@ -285,7 +288,9 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
           </div>
         )}
 
-        <p className="text-sm text-muted-foreground">
+        {account.connectionMethod !== "zernio" && (
+          <>
+          <p className="text-sm text-muted-foreground">
           Preencha os campos abaixo, na ordem, pra conectar (ou trocar) essa conta — cada um tem um botão que já
           abre a tela certa da Meta. Deixe em branco o que você não quer alterar. Guia completo em{" "}
           <a
@@ -297,7 +302,7 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
             docs/04-integracao-meta.md
           </a>
           .
-        </p>
+          </p>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field
@@ -367,6 +372,8 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
             </Button>
           </div>
         </form>
+          </>
+        )}
       </CardContent>
     </Card>
   );
