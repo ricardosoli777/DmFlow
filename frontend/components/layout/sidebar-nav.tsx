@@ -17,6 +17,8 @@ const items = [
   { href: "/settings", label: "Configurações", icon: Settings },
 ];
 
+const mobileItems = [items[0], items[2], items[3], items[4], items[7]];
+
 export function SidebarNav() {
   const pathname = usePathname();
   const router = useRouter();
@@ -35,7 +37,8 @@ export function SidebarNav() {
   }
 
   return (
-    <aside className="flex h-screen w-60 flex-col border-r border-border bg-card p-4">
+    <>
+    <aside className="hidden h-screen w-60 shrink-0 flex-col border-r border-border bg-card p-4 md:flex">
       <div className="mb-4 flex items-center gap-2 px-2">
         <img src="/logo.svg" alt="" width={28} height={28} className="rounded-md" />
         <span className="text-lg font-bold">DMFlow</span>
@@ -83,5 +86,25 @@ export function SidebarNav() {
         Sair
       </button>
     </aside>
+
+    <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border bg-card/95 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_rgba(0,0,0,0.06)] backdrop-blur md:hidden">
+      {mobileItems.map((item) => {
+        const active = pathname === item.href;
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              "flex min-h-16 flex-col items-center justify-center gap-1 px-1 text-[10px] font-medium",
+              active ? "text-primary" : "text-muted-foreground",
+            )}
+          >
+            <item.icon size={19} strokeWidth={active ? 2.5 : 2} />
+            <span className="max-w-full truncate">{item.label}</span>
+          </Link>
+        );
+      })}
+    </nav>
+    </>
   );
 }

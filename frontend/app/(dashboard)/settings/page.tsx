@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Trash2, XCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, Trash2, XCircle } from "lucide-react";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
@@ -128,9 +128,12 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Configurações</h1>
-        <Button onClick={() => addAccount.mutate()} disabled={addAccount.isPending}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Configurações</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Conecte e gerencie suas contas do Instagram.</p>
+        </div>
+        <Button className="w-full sm:w-auto" onClick={() => addAccount.mutate()} disabled={addAccount.isPending}>
           + Nova conta Instagram
         </Button>
       </div>
@@ -202,6 +205,8 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["instagram-accounts"] }),
   });
 
+  const missingCredentials = account.error?.toLowerCase().includes("faltam credenciais") ?? false;
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const patch = Object.fromEntries(Object.entries(form).filter(([, v]) => v.trim() !== ""));
@@ -232,7 +237,7 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {account.connected ? (
-          <div className="flex items-center gap-3">
+          <div className="flex items-start gap-3 sm:items-center">
             <CheckCircle2 className="text-success" size={20} />
             <div>
               <p className="text-sm font-medium">
@@ -240,19 +245,19 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
               </p>
               <p className="text-xs text-muted-foreground">{account.connectionMethod === "zernio" ? "Conexão via Zernio" : `IG User ID: ${account.igUserId}`}</p>
             </div>
-            <Badge variant="ativo" className="ml-auto">
+            <Badge variant="ativo" className="ml-auto shrink-0">
               Conectado
             </Badge>
           </div>
         ) : (
-          <div className="flex items-center gap-3">
-            <XCircle className="text-danger" size={20} />
+          <div className="flex items-start gap-3 sm:items-center">
+            {missingCredentials ? <AlertCircle className="text-warning" size={20} /> : <XCircle className="text-danger" size={20} />}
             <div>
-              <p className="text-sm font-medium">Não conectado</p>
-              {account.error && <p className="text-xs text-muted-foreground">{friendlyConnectionError(account.error)}</p>}
+              <p className="text-sm font-medium">{missingCredentials ? "Configuração pendente" : "Não conectado"}</p>
+              {account.error && <p className="text-xs text-muted-foreground">{missingCredentials ? "Conecte pela Meta ou abra as credenciais abaixo." : friendlyConnectionError(account.error)}</p>}
             </div>
-            <Badge variant="erro" className="ml-auto">
-              Desconectado
+            <Badge variant={missingCredentials ? "pausado" : "erro"} className="ml-auto shrink-0">
+              {missingCredentials ? "Pendente" : "Desconectado"}
             </Badge>
           </div>
         )}
@@ -260,12 +265,12 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
         <hr className="border-border" />
 
         {account.connectionMethod !== "zernio" && (
-          <Button type="button" variant="secondary" onClick={() => oauth.mutate()} disabled={oauth.isPending}>
+          <Button className="w-full" type="button" variant="secondary" onClick={() => oauth.mutate()} disabled={oauth.isPending}>
             {oauth.isPending ? "Abrindo Meta..." : "Conectar com Meta/Instagram (OAuth)"}
           </Button>
         )}
 
-        <Button type="button" variant="secondary" onClick={() => zernio.mutate()} disabled={zernio.isPending}>
+        <Button className="w-full" type="button" variant="secondary" onClick={() => zernio.mutate()} disabled={zernio.isPending}>
           {zernio.isPending ? "Consultando Zernio..." : "Conectar via Zernio (alternativa)"}
         </Button>
 
@@ -289,8 +294,13 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
         )}
 
         {account.connectionMethod !== "zernio" && (
-          <>
-          <p className="text-sm text-muted-foreground">
+          <details className="group rounded-[var(--radius)] border border-border bg-muted/20">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-medium [&::-webkit-details-marker]:hidden">
+              <span>Credenciais da Meta</span>
+              <span className="text-xs text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
+            </summary>
+            <div className="border-t border-border p-4">
+          <p className="mb-4 text-sm text-muted-foreground">
           Preencha os campos abaixo, na ordem, pra conectar (ou trocar) essa conta — cada um tem um botão que já
           abre a tela certa da Meta. Deixe em branco o que você não quer alterar. Guia completo em{" "}
           <a
@@ -304,7 +314,7 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
           .
           </p>
 
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field
             fieldKey="appId"
             label="1. App ID"
@@ -367,12 +377,13 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
           )}
 
           <div className="sm:col-span-2">
-            <Button type="submit" disabled={save.isPending}>
+            <Button className="w-full sm:w-auto" type="submit" disabled={save.isPending}>
               {save.isPending ? "Testando conexão..." : "Salvar e testar conexão"}
             </Button>
           </div>
         </form>
-          </>
+            </div>
+          </details>
         )}
       </CardContent>
     </Card>

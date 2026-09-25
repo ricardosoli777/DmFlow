@@ -28,9 +28,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isFlowEditor = /^\/flows\/[^/]+$/.test(pathname);
 
   return (
-    <div className="flex">
+    <div className="min-h-screen md:flex">
       {!isFlowEditor && <SidebarNav />}
-      <main className={`flex-1 overflow-y-auto ${isFlowEditor ? "h-screen" : "p-8"}`}>{children}</main>
+      <main className={`min-w-0 flex-1 overflow-y-auto ${isFlowEditor ? "h-screen" : "p-4 pb-24 sm:p-6 sm:pb-24 md:p-8 md:pb-8"}`}>{children}</main>
     </div>
   );
 }
