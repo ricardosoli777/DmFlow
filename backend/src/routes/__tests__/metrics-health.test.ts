@@ -12,7 +12,7 @@ vi.mock("@dmflow/db", () => ({ listInstagramAccounts: mocks.listAccounts }));
 vi.mock("../../lib/prisma", () => ({
   prisma: {
     rawEvent: { findFirst: vi.fn().mockResolvedValue(null), count: vi.fn().mockResolvedValue(0) },
-    zernioConnection: { findUnique: mocks.findConnection },
+    zernioConnection: { findMany: mocks.findConnection },
   },
 }));
 vi.mock("../../lib/queue", () => ({ instagramEventsQueue: { getJobCounts: vi.fn().mockResolvedValue({}) } }));
@@ -29,7 +29,7 @@ beforeEach(() => {
     igUserId: "pending-1",
     graphApiVersion: "v21.0",
   }]);
-  mocks.findConnection.mockReset().mockResolvedValue(null);
+  mocks.findConnection.mockReset().mockResolvedValue([]);
   mocks.checkMeta.mockReset().mockResolvedValue({ connected: false, error: "Faltam credenciais" });
   mocks.checkZernio.mockReset().mockResolvedValue({ connected: true, username: "example" });
 });
@@ -49,16 +49,34 @@ async function health() {
 
 describe("dashboard connection health", () => {
   it("uses the Zernio API check for an account linked through Zernio", async () => {
-    mocks.findConnection.mockResolvedValue({ instagramAccountId: "instagram-1", accountId: "zernio-1" });
+    mocks.findConnection.mockResolvedValue([{ instagramAccountId: "instagram-1", accountId: "zernio-1", keySlot: "primary", username: "example" }]);
     expect(await health()).toEqual({
       id: "instagram-1",
       igUsername: "example",
       connectionMethod: "zernio",
+      zernioKeySlot: "primary",
       connected: true,
+      providerHealthy: true,
       username: "example",
     });
-    expect(mocks.checkZernio).toHaveBeenCalledWith("workspace-1", "zernio-1");
+    expect(mocks.checkZernio).toHaveBeenCalledWith("workspace-1", "zernio-1", "primary");
     expect(mocks.checkMeta).not.toHaveBeenCalled();
+  });
+
+  it("keeps a linked account visible but flags a temporary Zernio validation failure", async () => {
+    mocks.findConnection.mockResolvedValue([{ instagramAccountId: "instagram-1", accountId: "zernio-2", keySlot: "secondary", username: "example" }]);
+    mocks.checkZernio.mockResolvedValue({ connected: false, error: "Não foi possível validar a conexão com o Zernio" });
+    expect(await health()).toEqual({
+      id: "instagram-1",
+      igUsername: "example",
+      connectionMethod: "zernio",
+      zernioKeySlot: "secondary",
+      connected: true,
+      providerHealthy: false,
+      username: "example",
+      error: "Não foi possível validar a conexão com o Zernio",
+    });
+    expect(mocks.checkZernio).toHaveBeenCalledWith("workspace-1", "zernio-2", "secondary");
   });
 
   it("continues to check Meta for accounts without a Zernio link", async () => {

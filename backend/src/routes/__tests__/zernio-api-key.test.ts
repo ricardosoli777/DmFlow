@@ -6,12 +6,15 @@ const mocks = vi.hoisted(() => ({
   findKey: vi.fn(),
   upsertKey: vi.fn(),
   findConnection: vi.fn(),
+  upsertConnection: vi.fn(),
+  findInstagramAccount: vi.fn(),
 }));
 
 vi.mock("../../lib/prisma", () => ({
   prisma: {
     zernioApiKey: { findUnique: mocks.findKey, upsert: mocks.upsertKey },
-    zernioConnection: { findUnique: mocks.findConnection },
+    zernioConnection: { findUnique: mocks.findConnection, upsert: mocks.upsertConnection },
+    instagramAccount: { findFirst: mocks.findInstagramAccount },
   },
 }));
 
@@ -39,6 +42,8 @@ beforeEach(() => {
   mocks.findKey.mockReset().mockResolvedValue(null);
   mocks.upsertKey.mockReset().mockResolvedValue({});
   mocks.findConnection.mockReset().mockResolvedValue(null);
+  mocks.upsertConnection.mockReset().mockResolvedValue({});
+  mocks.findInstagramAccount.mockReset().mockResolvedValue({ id: "instagram-2" });
 });
 
 afterEach(() => {
@@ -55,11 +60,11 @@ async function app() {
 
 describe("Zernio API key", () => {
   it("does not expose the saved key and denies members write access", async () => {
-    mocks.findKey.mockResolvedValue({ workspaceId: "workspace-1" });
+    mocks.findKey.mockResolvedValue({ apiKey: "encrypted-key", secondaryApiKey: null });
     const server = await app();
     try {
       const status = await server.inject({ method: "GET", url: "/zernio-api-key", headers: { "x-test-role": "MEMBER" } });
-      expect(status.json()).toEqual({ configured: true, canManage: false });
+      expect(status.json()).toEqual({ configured: true, secondaryConfigured: false, canManage: false });
 
       const update = await server.inject({ method: "PUT", url: "/zernio-api-key", headers: { "x-test-role": "MEMBER" }, payload: { apiKey: "secret-key" } });
       expect(update.statusCode).toBe(403);
@@ -100,6 +105,21 @@ describe("Zernio API key", () => {
     }
   });
 
+  it("stores a second encrypted key without replacing the first key", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ accounts: [] }), { status: 200 })));
+    const server = await app();
+    try {
+      const response = await server.inject({ method: "PUT", url: "/zernio-api-key", payload: { apiKey: "second-key", slot: "secondary" } });
+      expect(response.statusCode).toBe(200);
+      const stored = mocks.upsertKey.mock.calls[0][0];
+      expect(stored.update.apiKey).toBeUndefined();
+      expect(decryptCredential(stored.update.secondaryApiKey)).toBe("second-key");
+      expect(stored.create.apiKey).toBe("");
+    } finally {
+      await server.close();
+    }
+  });
+
   it("uses the saved workspace key when listing Zernio accounts", async () => {
     mocks.findKey.mockResolvedValue({ apiKey: encryptCredential("stored-key") });
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ accounts: [] }), { status: 200 })));
@@ -125,5 +145,39 @@ describe("Zernio API key", () => {
       connected: false,
       error: "Conta Instagram não encontrada no Zernio",
     });
+  });
+
+  it("uses the second key for the second account slot", async () => {
+    mocks.findKey.mockResolvedValue({ apiKey: encryptCredential("first-key"), secondaryApiKey: encryptCredential("second-key") });
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ accounts: [] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const server = await app();
+    try {
+      const response = await server.inject({ method: "GET", url: "/zernio-accounts?slot=secondary" });
+      expect(response.statusCode).toBe(200);
+      expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe("Bearer second-key");
+      expect(mocks.findConnection).toHaveBeenCalledWith({ where: { workspaceId_keySlot: { workspaceId: "workspace-1", keySlot: "secondary" } } });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("links a second Zernio account to a different Instagram account", async () => {
+    mocks.findKey.mockResolvedValue({ apiKey: encryptCredential("first-key"), secondaryApiKey: encryptCredential("second-key") });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      accounts: [{ _id: "zernio-2", platform: "instagram", profileId: "profile-2", username: "second" }],
+    }), { status: 200 })));
+    const server = await app();
+    try {
+      const response = await server.inject({ method: "POST", url: "/zernio-accounts/select", payload: {
+        accountId: "zernio-2", instagramAccountId: "instagram-2", slot: "secondary",
+      } });
+      expect(response.statusCode).toBe(200);
+      const saved = mocks.upsertConnection.mock.calls[0][0];
+      expect(saved.where).toEqual({ workspaceId_keySlot: { workspaceId: "workspace-1", keySlot: "secondary" } });
+      expect(saved.create).toMatchObject({ accountId: "zernio-2", instagramAccountId: "instagram-2", keySlot: "secondary" });
+    } finally {
+      await server.close();
+    }
   });
 });

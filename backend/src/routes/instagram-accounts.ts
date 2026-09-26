@@ -30,7 +30,7 @@ export async function instagramAccountRoutes(app: FastifyInstance) {
         hasVerifyToken: Boolean(a.verifyToken),
         hasPageAccessToken: Boolean(a.pageAccessToken),
         ...(await checkInstagramConnection(a.pageAccessToken, a.igUserId, a.graphApiVersion)),
-        ...(await prisma.zernioConnection.findFirst({ where: { instagramAccountId: a.id } }).then((connection) => connection ? { connected: true, username: connection.username, connectionMethod: "zernio" } : {})),
+        ...(await prisma.zernioConnection.findFirst({ where: { instagramAccountId: a.id, workspaceId: req.workspaceId } }).then((connection) => connection ? { connected: true, username: connection.username, connectionMethod: "zernio", zernioKeySlot: connection.keySlot } : {})),
       })),
     );
     return withStatus;
@@ -72,7 +72,10 @@ export async function instagramAccountRoutes(app: FastifyInstance) {
       const existing = await prisma.instagramAccount.findUnique({ where: { id } });
       if (!existing || existing.workspaceId !== req.workspaceId) return reply.status(404).send({ error: "not found" });
 
-      await prisma.instagramAccount.delete({ where: { id } });
+      await prisma.$transaction([
+        prisma.zernioConnection.deleteMany({ where: { workspaceId: req.workspaceId, instagramAccountId: id } }),
+        prisma.instagramAccount.delete({ where: { id } }),
+      ]);
       return reply.status(204).send();
     },
   );

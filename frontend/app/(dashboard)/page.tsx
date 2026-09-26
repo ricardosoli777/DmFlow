@@ -14,7 +14,7 @@ type Overview = {
   messagesSent: number;
 };
 
-type AccountStatus = { id: string; igUsername: string; connected: boolean; connectionMethod: "meta" | "zernio"; username?: string; error?: string };
+type AccountStatus = { id: string; igUsername: string; connected: boolean; connectionMethod: "meta" | "zernio"; zernioKeySlot?: "primary" | "secondary"; providerHealthy?: boolean; username?: string; error?: string };
 
 type Health = {
   lastEventAt: string | null;
@@ -76,8 +76,8 @@ export default function OverviewPage() {
             <HealthCard
               key={a.id}
               title={a.igUsername || a.username ? `Conexão — @${a.igUsername || a.username}` : "Conexão com o Instagram"}
-              ok={a.connected}
-              okText={a.connectionMethod === "zernio" ? "Conta encontrada na API do Zernio" : a.username ? `Conectado como @${a.username} via Meta` : "Conectado via Meta"}
+              ok={a.connectionMethod === "zernio" && !a.providerHealthy ? null : a.connected}
+              okText={a.connectionMethod === "zernio" ? a.providerHealthy ? `Conta encontrada no Zernio — chave ${a.zernioKeySlot === "secondary" ? "2" : "1"}` : `Conta vinculada (chave ${a.zernioKeySlot === "secondary" ? "2" : "1"}); ${a.error ?? "aguardando validação do Zernio"}` : a.username ? `Conectado como @${a.username} via Meta` : "Conectado via Meta"}
               badText={a.error ?? "Sem resposta da Graph API"}
             />
           ))}

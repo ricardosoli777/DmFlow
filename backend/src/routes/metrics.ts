@@ -64,7 +64,7 @@ export async function metricsRoutes(app: FastifyInstance) {
   app.get("/metrics/health", async (req) => {
     const recentSince = new Date(Date.now() - 10 * 60_000); // últimos 10min
 
-    const [lastEvent, pendingEvents, jobCounts, accounts, zernioConnection] = await Promise.all([
+    const [lastEvent, pendingEvents, jobCounts, accounts, zernioConnections] = await Promise.all([
       prisma.rawEvent.findFirst({ where: { workspaceId: req.workspaceId }, orderBy: { createdAt: "desc" } }),
       // só conta evento parado se for RECENTE — um evento antigo que falhou
       // de vez (ex: janela de 24h fechada) fica marcado como processado pelo
@@ -75,18 +75,22 @@ export async function metricsRoutes(app: FastifyInstance) {
       }),
       instagramEventsQueue.getJobCounts("waiting", "active", "failed", "completed"),
       listInstagramAccounts(req.workspaceId),
-      prisma.zernioConnection.findUnique({ where: { workspaceId: req.workspaceId } }),
+      prisma.zernioConnection.findMany({ where: { workspaceId: req.workspaceId } }),
     ]);
 
     const accountsStatus = await Promise.all(
       accounts.map(async (a) => {
-        const viaZernio = zernioConnection?.instagramAccountId === a.id;
+        const zernioConnection = zernioConnections.find((connection) => connection.instagramAccountId === a.id);
+        const zernioStatus = zernioConnection
+          ? await checkZernioConnection(req.workspaceId, zernioConnection.accountId, zernioConnection.keySlot === "secondary" ? "secondary" : "primary")
+          : null;
         return {
           id: a.id,
           igUsername: a.igUsername,
-          connectionMethod: viaZernio ? "zernio" : "meta",
-          ...(viaZernio
-            ? await checkZernioConnection(req.workspaceId, zernioConnection.accountId)
+          connectionMethod: zernioConnection ? "zernio" : "meta",
+          ...(zernioConnection ? { zernioKeySlot: zernioConnection.keySlot } : {}),
+          ...(zernioConnection
+            ? { connected: true, providerHealthy: zernioStatus?.connected ?? false, username: zernioStatus?.username ?? zernioConnection.username, error: zernioStatus?.error }
             : await checkInstagramConnection(a.pageAccessToken, a.igUserId, a.graphApiVersion)),
         };
       }),

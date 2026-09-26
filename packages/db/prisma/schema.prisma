@@ -40,7 +40,7 @@ model Workspace {
   members           WorkspaceMember[]
   invitations       WorkspaceInvitation[]
   instagramAccounts InstagramAccount[]
-  zernioConnection ZernioConnection?
+  zernioConnections ZernioConnection[]
   zernioApiKey     ZernioApiKey?
   contacts          Contact[]
   flows             Flow[]
@@ -121,8 +121,9 @@ model InstagramAccount {
 
 model ZernioConnection {
   id          String    @id @default(uuid())
-  workspaceId String    @unique
+  workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  keySlot     String    @default("primary")
   profileId   String
   accountId   String    @unique
   instagramAccountId String?   @unique
@@ -132,6 +133,7 @@ model ZernioConnection {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  @@unique([workspaceId, keySlot])
   @@map("zernio_connections")
 }
 
@@ -139,6 +141,7 @@ model ZernioApiKey {
   workspaceId String    @id
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   apiKey      String
+  secondaryApiKey String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 

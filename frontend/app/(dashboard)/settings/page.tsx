@@ -95,12 +95,14 @@ type InstagramAccountStatus = {
   igUserId?: string;
   graphApiVersion?: string;
   connectionMethod?: "meta" | "zernio";
+  zernioKeySlot?: ZernioSlot;
   hasAppSecret?: boolean;
   hasVerifyToken?: boolean;
   hasPageAccessToken?: boolean;
 };
 
-type ZernioKeyStatus = { configured: boolean; canManage: boolean };
+type ZernioSlot = "primary" | "secondary";
+type ZernioKeyStatus = { configured: boolean; secondaryConfigured: boolean; canManage: boolean };
 
 type FormState = {
   appId: string;
@@ -145,7 +147,15 @@ export default function SettingsPage() {
         </Button>
       </div>
 
-      {zernioKey?.canManage && <ZernioApiKeyCard configured={zernioKey.configured} />}
+      {zernioKey?.canManage && (
+        <div className="flex flex-col gap-3">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ZernioApiKeyCard slot="primary" configured={zernioKey.configured} />
+            <ZernioApiKeyCard slot="secondary" configured={zernioKey.secondaryConfigured} />
+          </div>
+          <p className="text-sm text-muted-foreground">Para usar a segunda conta, salve a chave 2, crie outra conta Instagram e escolha “Conectar via Zernio — chave 2” nela.</p>
+        </div>
+      )}
 
       {isLoading && <p className="text-sm text-muted-foreground">Carregando contas conectadas...</p>}
       {!isLoading && !accounts?.length && (
@@ -157,20 +167,20 @@ export default function SettingsPage() {
       )}
 
       {(accounts ?? []).map((account) => (
-        <InstagramAccountCard key={account.id} account={account} />
+        <InstagramAccountCard key={account.id} account={account} zernioKeys={zernioKey} />
       ))}
     </div>
   );
 }
 
-function ZernioApiKeyCard({ configured }: { configured: boolean }) {
+function ZernioApiKeyCard({ slot, configured }: { slot: ZernioSlot; configured: boolean }) {
   const queryClient = useQueryClient();
   const [apiKey, setApiKey] = useState("");
   const [open, setOpen] = useState(false);
   const [feedback, setFeedback] = useState<{ text: string; error: boolean } | null>(null);
 
   const saveKey = useMutation({
-    mutationFn: () => api.put<{ configured: boolean; connected: boolean }>("/zernio-api-key", { apiKey: apiKey.trim() }),
+    mutationFn: () => api.put<{ configured: boolean; connected: boolean }>("/zernio-api-key", { apiKey: apiKey.trim(), slot }),
     onSuccess: () => {
       setApiKey("");
       setOpen(false);
@@ -184,7 +194,7 @@ function ZernioApiKeyCard({ configured }: { configured: boolean }) {
   });
 
   const testKey = useMutation({
-    mutationFn: () => api.post<{ configured: boolean; connected: boolean }>("/zernio-api-key/test", {}),
+    mutationFn: () => api.post<{ configured: boolean; connected: boolean }>("/zernio-api-key/test", { slot }),
     onSuccess: ({ connected }) => setFeedback({
       text: connected ? "A chave salva está funcionando no Zernio." : "A chave salva não conseguiu acessar o Zernio.",
       error: !connected,
@@ -195,14 +205,14 @@ function ZernioApiKeyCard({ configured }: { configured: boolean }) {
   return (
     <Card>
       <CardHeader className="flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-        <CardTitle>Chave de API do Zernio</CardTitle>
-        <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
+        <CardTitle>Chave de API do Zernio {slot === "primary" ? "1" : "2"}</CardTitle>
+        <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={() => { setApiKey(""); setOpen((value) => !value); }} aria-expanded={open}>
           {open ? "Ocultar credenciais" : "Gerenciar chave"}
         </Button>
       </CardHeader>
       {open && <CardContent>
         <p className="mb-4 text-sm text-muted-foreground">
-          {configured ? "Há uma chave configurada. Cole outra para substituí-la; a chave salva não é exibida novamente." : "Cole sua chave para conectar as contas do Zernio neste workspace."}
+          {configured ? "Há uma chave configurada neste acesso. Cole outra para substituí-la; a chave salva não é exibida novamente." : `Cole a chave do ${slot === "primary" ? "primeiro" : "segundo"} acesso ao Zernio.`}
         </p>
         <form className="flex flex-col gap-3" onSubmit={(event) => { event.preventDefault(); saveKey.mutate(); }}>
           <label className="flex flex-col gap-1 text-sm">
@@ -234,7 +244,7 @@ function ZernioApiKeyCard({ configured }: { configured: boolean }) {
   );
 }
 
-function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) {
+function InstagramAccountCard({ account, zernioKeys }: { account: InstagramAccountStatus; zernioKeys?: ZernioKeyStatus }) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<FormState>(emptyForm);
   const [credentialsOpen, setCredentialsOpen] = useState(false);
@@ -242,9 +252,11 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
   const [showTechnicalError, setShowTechnicalError] = useState(false);
   const [zernioAccounts, setZernioAccounts] = useState<Array<{ accountId: string; username: string; profileId?: string }>>([]);
   const [zernioConnectedAccountId, setZernioConnectedAccountId] = useState<string | null>(null);
+  const [zernioSlot, setZernioSlot] = useState<ZernioSlot>("primary");
   const zernio = useMutation({
-    mutationFn: () => api.get<{ accounts: Array<{ accountId: string; username: string; profileId?: string }>; connectedAccountId: string | null }>("/zernio-accounts"),
-    onSuccess: ({ accounts, connectedAccountId }) => {
+    mutationFn: (slot: ZernioSlot) => api.get<{ accounts: Array<{ accountId: string; username: string; profileId?: string }>; connectedAccountId: string | null }>(`/zernio-accounts?slot=${slot}`),
+    onSuccess: ({ accounts, connectedAccountId }, slot) => {
+      setZernioSlot(slot);
       setZernioAccounts(accounts);
       setZernioConnectedAccountId(connectedAccountId);
       if (!accounts.length) setSaveError("Nenhuma conta Instagram conectada no Zernio ainda.");
@@ -253,7 +265,7 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
   });
 
   const selectZernio = useMutation({
-    mutationFn: (accountId: string) => api.post<{ connected: boolean; accountId: string; username?: string }>("/zernio-accounts/select", { accountId, instagramAccountId: account.id }),
+    mutationFn: (accountId: string) => api.post<{ connected: boolean; accountId: string; username?: string }>("/zernio-accounts/select", { accountId, instagramAccountId: account.id, slot: zernioSlot }),
     onSuccess: ({ accountId, username }) => {
       setZernioConnectedAccountId(accountId);
       setSaveError("Zernio conectado como @" + (username ?? ""));
@@ -325,7 +337,7 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
               <p className="text-sm font-medium">
                 Conectado como <span className="text-primary">@{account.username}</span>
               </p>
-              <p className="text-xs text-muted-foreground">{account.connectionMethod === "zernio" ? "Conexão via Zernio" : `IG User ID: ${account.igUserId}`}</p>
+              <p className="text-xs text-muted-foreground">{account.connectionMethod === "zernio" ? `Conexão via Zernio — chave ${account.zernioKeySlot === "secondary" ? "2" : "1"}` : `IG User ID: ${account.igUserId}`}</p>
             </div>
             <Badge variant="ativo" className="ml-auto shrink-0">
               Conectado
@@ -352,13 +364,20 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
           </Button>
         )}
 
-        <Button className="w-full" type="button" variant="secondary" onClick={() => zernio.mutate()} disabled={zernio.isPending}>
-          {zernio.isPending ? "Consultando Zernio..." : "Conectar via Zernio (alternativa)"}
-        </Button>
+        {zernioKeys?.canManage && zernioKeys.configured && (
+          <Button className="w-full" type="button" variant="secondary" onClick={() => zernio.mutate("primary")} disabled={zernio.isPending}>
+            {zernio.isPending ? "Consultando Zernio..." : "Conectar via Zernio — chave 1"}
+          </Button>
+        )}
+        {zernioKeys?.canManage && zernioKeys.secondaryConfigured && (
+          <Button className="w-full" type="button" variant="secondary" onClick={() => zernio.mutate("secondary")} disabled={zernio.isPending}>
+            {zernio.isPending ? "Consultando Zernio..." : "Conectar via Zernio — chave 2"}
+          </Button>
+        )}
 
         {zernioAccounts.length > 0 && (
           <div className="rounded-md border border-border bg-muted/30 p-3">
-            <p className="mb-2 text-sm font-medium">Escolha uma conta já conectada no Zernio:</p>
+            <p className="mb-2 text-sm font-medium">Escolha uma conta do Zernio — chave {zernioSlot === "primary" ? "1" : "2"}:</p>
             <div className="flex flex-col gap-2">
               {zernioAccounts.map((zernioAccount) => (
                 <Button
