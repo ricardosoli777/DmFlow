@@ -41,6 +41,7 @@ model Workspace {
   invitations       WorkspaceInvitation[]
   instagramAccounts InstagramAccount[]
   zernioConnection ZernioConnection?
+  zernioApiKey     ZernioApiKey?
   contacts          Contact[]
   flows             Flow[]
   flowTemplates     FlowTemplate[]
@@ -133,6 +134,17 @@ model ZernioConnection {
 
   @@map("zernio_connections")
 }
+
+model ZernioApiKey {
+  workspaceId String    @id
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  apiKey      String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("zernio_api_keys")
+}
+
 model Contact {
   id                 String            @id @default(uuid())
   workspaceId        String

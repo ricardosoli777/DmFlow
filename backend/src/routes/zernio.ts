@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { decryptCredential, encryptCredential } from "@dmflow/db";
 import { env } from "../env";
 import { requireAuth, requireRole } from "../lib/auth";
 import { prisma } from "../lib/prisma";
@@ -12,26 +13,72 @@ function instagramAccount(account: ZernioAccount) {
   return { accountId: account._id, profileId, username: account.username ?? "", platform: account.platform };
 }
 
-async function zernio<T>(path: string, init?: RequestInit): Promise<T> {
-  if (!env.ZERNIO_API_KEY) throw new Error("Zernio não configurado no servidor");
+class ZernioHttpError extends Error {
+  constructor(readonly status: number) {
+    super(`Zernio HTTP ${status}`);
+  }
+}
+
+async function workspaceApiKey(workspaceId: string): Promise<string> {
+  const stored = await prisma.zernioApiKey.findUnique({ where: { workspaceId } });
+  return stored ? decryptCredential(stored.apiKey) : env.ZERNIO_API_KEY;
+}
+
+async function zernio<T>(apiKey: string, path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`https://zernio.com/api/v1${path}`, {
     ...init,
-    headers: { Authorization: `Bearer ${env.ZERNIO_API_KEY}`, Accept: "application/json", ...(init?.headers ?? {}) },
+    headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json", ...(init?.headers ?? {}) },
   });
-  const body = await response.json() as T & { error?: string; message?: string };
-  if (!response.ok) throw new Error(body.message ?? body.error ?? `Zernio HTTP ${response.status}`);
-  return body;
+  if (!response.ok) throw new ZernioHttpError(response.status);
+  return response.json() as Promise<T>;
 }
 
 export async function zernioRoutes(app: FastifyInstance) {
+  app.get("/zernio-api-key", { preHandler: requireAuth }, async (req) => {
+    const stored = await prisma.zernioApiKey.findUnique({ where: { workspaceId: req.workspaceId }, select: { workspaceId: true } });
+    return {
+      configured: Boolean(stored || env.ZERNIO_API_KEY),
+      canManage: req.role === "OWNER" || req.role === "ADMIN",
+    };
+  });
+
+  app.put("/zernio-api-key", { preHandler: [requireAuth, requireRole("OWNER", "ADMIN")] }, async (req, reply) => {
+    const { apiKey } = z.object({ apiKey: z.string().trim().min(1) }).parse(req.body);
+    try {
+      await zernio(apiKey, "/accounts");
+    } catch (error) {
+      const invalid = error instanceof ZernioHttpError && (error.status === 401 || error.status === 403);
+      return reply.status(invalid ? 400 : 502).send({ error: invalid ? "Chave Zernio inválida ou sem acesso" : "Não foi possível validar a chave no Zernio" });
+    }
+    const encrypted = encryptCredential(apiKey);
+    await prisma.zernioApiKey.upsert({
+      where: { workspaceId: req.workspaceId },
+      update: { apiKey: encrypted },
+      create: { workspaceId: req.workspaceId, apiKey: encrypted },
+    });
+    return { configured: true, connected: true };
+  });
+
+  app.post("/zernio-api-key/test", { preHandler: [requireAuth, requireRole("OWNER", "ADMIN")] }, async (req) => {
+    const apiKey = await workspaceApiKey(req.workspaceId);
+    if (!apiKey) return { configured: false, connected: false };
+    try {
+      await zernio(apiKey, "/accounts");
+      return { configured: true, connected: true };
+    } catch {
+      return { configured: true, connected: false };
+    }
+  });
+
   app.get("/zernio-connection", { preHandler: requireAuth }, async (req) => {
     const connection = await prisma.zernioConnection.findUnique({ where: { workspaceId: req.workspaceId } });
     return connection ? { connected: true, accountId: connection.accountId, username: connection.username, profileId: connection.profileId } : { connected: false };
   });
 
   app.get("/zernio-accounts", { preHandler: [requireAuth, requireRole("OWNER", "ADMIN")] }, async (req, reply) => {
-    if (!env.ZERNIO_API_KEY) return reply.status(503).send({ error: "Zernio não configurado no servidor" });
-    const available = await zernio<{ accounts?: ZernioAccount[] }>("/accounts");
+    const apiKey = await workspaceApiKey(req.workspaceId);
+    if (!apiKey) return reply.status(503).send({ error: "Configure a chave de API do Zernio em Configurações" });
+    const available = await zernio<{ accounts?: ZernioAccount[] }>(apiKey, "/accounts");
     const current = await prisma.zernioConnection.findUnique({ where: { workspaceId: req.workspaceId } });
     return {
       accounts: (available.accounts ?? []).filter((account) => account.platform === "instagram").map(instagramAccount),
@@ -40,11 +87,12 @@ export async function zernioRoutes(app: FastifyInstance) {
   });
 
   app.post("/zernio-accounts/select", { preHandler: [requireAuth, requireRole("OWNER", "ADMIN")] }, async (req, reply) => {
-    if (!env.ZERNIO_API_KEY) return reply.status(503).send({ error: "Zernio não configurado no servidor" });
+    const apiKey = await workspaceApiKey(req.workspaceId);
+    if (!apiKey) return reply.status(503).send({ error: "Configure a chave de API do Zernio em Configurações" });
     const body = z.object({ accountId: z.string().min(1), instagramAccountId: z.string().min(1) }).parse(req.body);
     const targetAccount = await prisma.instagramAccount.findFirst({ where: { id: body.instagramAccountId, workspaceId: req.workspaceId } });
     if (!targetAccount) return reply.status(404).send({ error: "Conta Instagram do DMFlow não encontrada" });
-    const available = await zernio<{ accounts?: ZernioAccount[] }>("/accounts");
+    const available = await zernio<{ accounts?: ZernioAccount[] }>(apiKey, "/accounts");
     const account = (available.accounts ?? []).find((item) => item._id === body.accountId && item.platform === "instagram");
     if (!account) return reply.status(404).send({ error: "Conta Instagram não encontrada no Zernio" });
     const selected = instagramAccount(account);
@@ -58,25 +106,26 @@ export async function zernioRoutes(app: FastifyInstance) {
   });
 
   app.get("/oauth/zernio/start", { preHandler: [requireAuth, requireRole("OWNER", "ADMIN")] }, async (req, reply) => {
-    if (!env.ZERNIO_API_KEY) return reply.status(503).send({ error: "Zernio não configurado no servidor" });
+    const apiKey = await workspaceApiKey(req.workspaceId);
+    if (!apiKey) return reply.status(503).send({ error: "Configure a chave de API do Zernio em Configurações" });
     const workspace = await prisma.workspace.findUniqueOrThrow({ where: { id: req.workspaceId } });
-    const available = await zernio<{ accounts?: ZernioAccount[] }>("/accounts");
+    const available = await zernio<{ accounts?: ZernioAccount[] }>(apiKey, "/accounts");
     const instagramAccounts = (available.accounts ?? []).filter((account) => account.platform === "instagram");
     let connection = await prisma.zernioConnection.findUnique({ where: { workspaceId: req.workspaceId } });
     let profileId = connection?.profileId;
     if (!profileId) {
-      const listed = await zernio<{ profiles?: Array<{ _id: string; name: string }> }>("/profiles");
+      const listed = await zernio<{ profiles?: Array<{ _id: string; name: string }> }>(apiKey, "/profiles");
       const existing = listed.profiles?.find((profile) => profile.name === `DMFlow — ${workspace.name}`);
       if (existing) profileId = existing._id;
       else {
-        const created = await zernio<{ profile: { _id: string } }>("/profiles", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: `DMFlow — ${workspace.name}` }) });
+        const created = await zernio<{ profile: { _id: string } }>(apiKey, "/profiles", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: `DMFlow — ${workspace.name}` }) });
         profileId = created.profile._id;
       }
     }
     const state = app.jwt.sign({ workspaceId: req.workspaceId, userId: req.userId, profileId }, { expiresIn: "10m" });
     const redirect = `${env.PUBLIC_API_URL}/oauth/zernio/callback?state=${encodeURIComponent(state)}`;
     const params = new URLSearchParams({ profileId, redirect_url: redirect });
-    const result = await zernio<{ data?: { authUrl: string }; authUrl?: string }>(`/connect/instagram?${params}`);
+    const result = await zernio<{ data?: { authUrl: string }; authUrl?: string }>(apiKey, `/connect/instagram?${params}`);
     const authUrl = result.authUrl ?? result.data?.authUrl;
     if (!authUrl) return reply.status(502).send({ error: "Zernio não retornou URL de conexão" });
     return connectResponse.parse({ authUrl });

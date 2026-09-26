@@ -100,6 +100,8 @@ type InstagramAccountStatus = {
   hasPageAccessToken?: boolean;
 };
 
+type ZernioKeyStatus = { configured: boolean; canManage: boolean };
+
 type FormState = {
   appId: string;
   appSecret: string;
@@ -121,6 +123,11 @@ export default function SettingsPage() {
     queryFn: () => api.get<InstagramAccountStatus[]>("/instagram-accounts"),
   });
 
+  const { data: zernioKey } = useQuery({
+    queryKey: ["zernio-api-key"],
+    queryFn: () => api.get<ZernioKeyStatus>("/zernio-api-key"),
+  });
+
   const addAccount = useMutation({
     mutationFn: () => api.post<{ id: string }>("/instagram-accounts", {}),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["instagram-accounts"] }),
@@ -138,6 +145,8 @@ export default function SettingsPage() {
         </Button>
       </div>
 
+      {zernioKey?.canManage && <ZernioApiKeyCard configured={zernioKey.configured} />}
+
       {isLoading && <p className="text-sm text-muted-foreground">Carregando contas conectadas...</p>}
       {!isLoading && !accounts?.length && (
         <Card>
@@ -151,6 +160,77 @@ export default function SettingsPage() {
         <InstagramAccountCard key={account.id} account={account} />
       ))}
     </div>
+  );
+}
+
+function ZernioApiKeyCard({ configured }: { configured: boolean }) {
+  const queryClient = useQueryClient();
+  const [apiKey, setApiKey] = useState("");
+  const [open, setOpen] = useState(false);
+  const [feedback, setFeedback] = useState<{ text: string; error: boolean } | null>(null);
+
+  const saveKey = useMutation({
+    mutationFn: () => api.put<{ configured: boolean; connected: boolean }>("/zernio-api-key", { apiKey: apiKey.trim() }),
+    onSuccess: () => {
+      setApiKey("");
+      setOpen(false);
+      setFeedback({ text: "Chave validada e salva para este workspace.", error: false });
+      queryClient.invalidateQueries({ queryKey: ["zernio-api-key"] });
+    },
+    onError: (error: unknown) => {
+      const invalid = error instanceof Error && error.message.includes("API error 400");
+      setFeedback({ text: invalid ? "Chave inválida ou sem acesso ao Zernio." : "Não foi possível validar a chave agora. Tente novamente.", error: true });
+    },
+  });
+
+  const testKey = useMutation({
+    mutationFn: () => api.post<{ configured: boolean; connected: boolean }>("/zernio-api-key/test", {}),
+    onSuccess: ({ connected }) => setFeedback({
+      text: connected ? "A chave salva está funcionando no Zernio." : "A chave salva não conseguiu acessar o Zernio.",
+      error: !connected,
+    }),
+    onError: () => setFeedback({ text: "Não foi possível testar a chave agora.", error: true }),
+  });
+
+  return (
+    <Card>
+      <CardHeader className="flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+        <CardTitle>Chave de API do Zernio</CardTitle>
+        <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
+          {open ? "Ocultar credenciais" : "Gerenciar chave"}
+        </Button>
+      </CardHeader>
+      {open && <CardContent>
+        <p className="mb-4 text-sm text-muted-foreground">
+          {configured ? "Há uma chave configurada. Cole outra para substituí-la; a chave salva não é exibida novamente." : "Cole sua chave para conectar as contas do Zernio neste workspace."}
+        </p>
+        <form className="flex flex-col gap-3" onSubmit={(event) => { event.preventDefault(); saveKey.mutate(); }}>
+          <label className="flex flex-col gap-1 text-sm">
+            Chave de API
+            <input
+              type="password"
+              autoComplete="new-password"
+              className="w-full min-w-0 rounded-[var(--radius)] border border-border bg-background p-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+              value={apiKey}
+              placeholder={configured ? "Chave já salva — cole uma nova para substituir" : "Cole sua chave de API do Zernio"}
+              onChange={(event) => { setApiKey(event.target.value); setFeedback(null); }}
+              required
+            />
+          </label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button type="submit" disabled={!apiKey.trim() || saveKey.isPending}>
+              {saveKey.isPending ? "Validando..." : "Salvar e validar"}
+            </Button>
+            {configured && (
+              <Button type="button" variant="secondary" onClick={() => testKey.mutate()} disabled={testKey.isPending}>
+                {testKey.isPending ? "Testando..." : "Testar chave salva"}
+              </Button>
+            )}
+          </div>
+        </form>
+        {feedback && <p role="status" className={`mt-3 text-sm ${feedback.error ? "text-danger" : "text-success"}`}>{feedback.text}</p>}
+      </CardContent>}
+    </Card>
   );
 }
 
