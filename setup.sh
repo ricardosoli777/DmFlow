@@ -1,27 +1,41 @@
 #!/usr/bin/env bash
-# Setup guiado do DMFlow — ver docs/08-reprodutibilidade-docker-github.md
-set -e
+# Instalação local: compila as imagens com as URLs definidas neste .env.
+set -euo pipefail
+cd "$(dirname "$0")"
 
-if ! command -v docker &> /dev/null; then
-  echo "Docker não encontrado. Instale em: https://www.docker.com/products/docker-desktop"
+if ! command -v docker >/dev/null 2>&1; then
+  echo "Docker não encontrado. Instale Docker Engine/Desktop: https://docs.docker.com/get-docker/" >&2
+  exit 1
+fi
+if ! docker compose version >/dev/null 2>&1; then
+  echo "Docker Compose v2 não encontrado. Instale/atualize o Docker com o plugin Compose." >&2
+  exit 1
+fi
+if ! docker info >/dev/null 2>&1; then
+  echo "Docker não está iniciado. Abra o Docker Desktop ou inicie o serviço Docker." >&2
   exit 1
 fi
 
-if [ ! -f .env ]; then
+if [[ ! -f .env ]]; then
   cp .env.example .env
-  echo ""
-  echo "Criei o arquivo .env a partir do .env.example."
-  echo "Abra o .env e troque o e-mail/senha do dashboard (DASHBOARD_ADMIN_EMAIL/"
-  echo "DASHBOARD_ADMIN_PASSWORD) e as senhas genéricas de banco/fila. Não precisa"
-  echo "preencher nada da Meta aqui — isso é feito depois, dentro do app, em"
-  echo "Configurações (veja docs/04-integracao-meta.md). Depois rode este script de novo."
+  echo "Arquivo .env criado. Edite POSTGRES_PASSWORD e a senha dentro de DATABASE_URL"
+  echo "com o mesmo valor. Preencha JWT_SECRET e META_CREDENTIALS_ENCRYPTION_KEY."
+  echo "Veja os comandos de geração no README. Depois rode este script novamente."
   exit 0
 fi
 
-echo "Subindo o DMFlow..."
-docker compose pull
-docker compose up -d
+env_value() { sed -n "s/^$1=//p" .env | tail -n 1; }
+for name in POSTGRES_PASSWORD DATABASE_URL JWT_SECRET META_CREDENTIALS_ENCRYPTION_KEY; do
+  value="$(env_value "$name")"
+  if [[ -z "$value" || "$value" == *troque_* ]]; then
+    echo "Preencha $name no .env antes de continuar (veja o README)." >&2
+    exit 1
+  fi
+done
 
-echo ""
-echo "Pronto! Acesse http://localhost:3000"
-echo "Login: o e-mail/senha definidos em DASHBOARD_ADMIN_EMAIL / DASHBOARD_ADMIN_PASSWORD no .env"
+docker compose config --quiet
+docker compose up --build -d
+docker compose ps
+echo "Acesse http://localhost:3000/register para criar a primeira conta."
+echo "Se definiu DASHBOARD_ADMIN_EMAIL, use http://localhost:3000/login com esse e-mail."
+echo "Sem provedor de e-mail, o link de confirmação aparece em: docker compose logs backend"

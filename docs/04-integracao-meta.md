@@ -6,6 +6,14 @@ Cole cada credencial direto no dashboard, em **Configurações** (`/settings`)
 — elas ficam guardadas no banco de dados do próprio app, não em arquivo
 nenhum. Caminhos exatos, na ordem:
 
+**Compatibilidade atual:** a conexão manual do DMFlow consulta
+`graph.facebook.com` e usa o **Page Access Token** de uma Página vinculada
+à conta Instagram profissional. O token gerado para o fluxo separado
+**Instagram API with Instagram Login** não é intercambiável com esse
+campo. A [coleção oficial da Meta para Facebook Login](https://www.postman.com/meta/instagram/request/lpx8lul/get-access-tokens-of-pages-you-manage)
+mostra o Page Access Token e o `instagram_business_account.id` na mesma
+resposta.
+
 ### 1. Converter a conta e vincular a Página
 
 1. No app do Instagram (celular): **Configurações → Conta → Mudar para conta
@@ -27,67 +35,33 @@ nenhum. Caminhos exatos, na ordem:
 
 ### 3. Adicionar o produto Instagram
 
-1. No menu lateral do app: **Adicionar produto** → localize **Instagram**
-   → **Configurar**.
-2. Isso abre o fluxo **"Instagram API setup"**, com passos numerados na
-   própria tela da Meta (conectar a conta Instagram Business, gerar token,
-   configurar webhooks) — siga por ele, os IDs abaixo aparecem nesse fluxo.
+1. No seu app da Meta, habilite a integração Instagram compatível com
+   **Facebook Login** e confira que a Página está vinculada à conta
+   Instagram profissional.
+2. A interface da Meta pode mostrar nomes de menu diferentes. O critério
+   decisivo para este caminho é conseguir obter, pela Graph API,
+   `instagram_business_account.id` e o `access_token` da Página.
 
-### 4. Gerar o **Page Access Token** (é este valor que vai no app)
+### 4. Obter o Page Access Token → campo **Token de acesso da página**
 
-O DMFlow precisa do token da **Página do Facebook vinculada ao Instagram**.
-Não cole aqui o App Secret, um token de usuário comum ou o token de teste do
-Instagram. O token correto aparece na resposta de `/me/accounts` como
-`access_token` da Página.
-
-#### Teste rápido (Development)
-
-O token gerado diretamente no Graph API Explorer é adequado para teste e
-normalmente expira. Ele pode validar a conexão, mas não deve ser tratado como
-credencial permanente de produção.
-
-1. Abra o [Graph API Explorer](https://developers.facebook.com/tools/explorer/)
-   e, no seletor no canto superior direito, escolha **o seu app** (não
-   “Graph API Explorer” genérico).
-2. Clique **Generate Access Token / Gerar token** → **User Token** e autorize
-   as permissões solicitadas para a Página e para mensagens/comentários
-   (`pages_show_list`, `pages_read_engagement`, `instagram_basic`,
-   `instagram_manage_comments` e
-   `instagram_manage_messages`). Em modo Development, sua conta precisa estar
-   como administradora/testadora do app.
-3. No campo de requisição, selecione **GET** e execute:
-   ` /me/accounts?fields=id,name,access_token,instagram_business_account `
-4. Localize a Página que está vinculada ao seu Instagram. Copie **somente o
-   valor de `access_token` dentro desse objeto de Página** (não copie o token
-   do topo nem o `instagram_business_account.id`). Esse é o **Page Access
-   Token**.
-5. Cole o valor inteiro em **Configurações → Token de acesso da página** no
-   DMFlow e salve. O app valida o token contra a Graph API antes de gravá-lo;
-   depois ele fica cifrado no banco de dados.
-
-Para conferir antes de salvar, execute no Explorer (substituindo os valores):
-`GET /SEU_IG_USER_ID?fields=id,username&access_token=SEU_PAGE_ACCESS_TOKEN`.
-Uma resposta JSON com `id` e `username` confirma que o token pertence à conta
-certa. Se aparecer **Invalid OAuth access token (code 190)**, gere outro token,
-confirme que escolheu a Página correta e que o Instagram é Business/Creator.
-
-#### Produção
-
-Para produção, gere primeiro um **User Access Token de longa duração** pelo
-fluxo de Login da Meta do seu app (ou estenda o token de teste pelo
-[Access Token Debugger](https://developers.facebook.com/tools/debug/accesstoken/)
-quando a Meta oferecer essa opção). Em seguida, repita `/me/accounts` usando
-esse User Token e copie o `access_token` da Página novamente. Esse é o Page
-Access Token usado pelo DMFlow. Tokens têm validade e precisam ser renovados;
-não existe garantia de token permanente. Se o app atender pessoas que não são
-administradores/testadores, publique-o em **Live** e conclua o App Review das
-permissões de mensagens/comentários antes de conectar clientes.
+1. Abra o Graph API Explorer da Meta, selecione o **seu app** e gere um
+   **User Access Token** com acesso à Página e às permissões necessárias
+   para comentários e mensagens.
+2. Com esse User Token, execute:
+   `GET /me/accounts?fields=id,name,access_token,instagram_business_account`.
+3. Na resposta, encontre a Página vinculada à sua conta Instagram. Copie
+   somente o `access_token` **dentro do objeto dessa Página** para o
+   campo **Token de acesso da página**. Não use o token de usuário mostrado
+   no topo do Explorer nem o token do fluxo Instagram Login.
+4. O DMFlow testa o token ao salvar. Se houver erro de autenticação,
+   confirme a Página selecionada, permissões e validade do token na
+   ferramenta de depuração de tokens da Meta. Planeje a renovação de
+   tokens que expirarem; o guia não assume validade permanente.
 
 ### 5. Descobrir o Instagram Business Account ID → campo **ID da conta Instagram**
 
-1. No **Graph API Explorer**, com o token de usuário gerado no passo 4, rode:
-   `GET /me/accounts?fields=id,name,instagram_business_account`
-2. Na resposta JSON, dentro da página certa, o campo
+1. Na resposta do `/me/accounts` do passo 4, localize a mesma Página.
+2. O campo
    `instagram_business_account.id` é o valor a colar no campo **ID da conta
    Instagram** em Configurações (é um número longo, não confundir com o
    `@usuário`).
@@ -143,7 +117,8 @@ A Meta mantém duas nomenclaturas em paralelo — depende de qual fluxo
 aparece pra você no **Instagram API setup** dentro do app (normalmente ela
 já pré-seleciona certo, isso aqui é só referência).
 
-**Fluxo novo — "Instagram Business Login":**
+**Fluxo separado — "Instagram Business Login" (referência; token desse
+fluxo não serve para a conexão manual atual do DMFlow):**
 
 | Permissão | Pra que serve |
 |---|---|
@@ -160,6 +135,7 @@ já pré-seleciona certo, isso aqui é só referência).
 | `instagram_manage_messages` | Obrigatória — envio/recebimento de DM (RF03) |
 | `pages_show_list` | Listar as Páginas da sua conta, pra achar a que tem o Instagram vinculado |
 | `pages_read_engagement` | Ler engajamento da Página (comentários passam por aqui nesse fluxo) |
+| `pages_manage_metadata` | Assinar webhooks via API — a Meta às vezes exige mesmo configurando pela UI |
 
 **Não precisa (pode desmarcar se a Meta oferecer):** `instagram_content_publish`
 / `instagram_business_content_publish` (publicação de posts), e qualquer

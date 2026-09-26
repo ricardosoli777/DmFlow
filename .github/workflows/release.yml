@@ -37,9 +37,15 @@ jobs:
       # NEXT_PUBLIC_* é gravado no bundle em build time (ver frontend/Dockerfile) —
       # só o frontend precisa; nos outros services o build-arg fica vazio/ignorado.
       - id: buildargs
+        env:
+          DMFLOW_PUBLIC_API_URL: ${{ secrets.DMFLOW_PUBLIC_API_URL }}
         run: |
           if [ "${{ matrix.service }}" = "frontend" ]; then
-            echo "next_public_api_url=https://hooks.arkitekt.space" >> "$GITHUB_OUTPUT"
+            if [ -z "$DMFLOW_PUBLIC_API_URL" ]; then
+              echo "::error::Configure o secret DMFLOW_PUBLIC_API_URL com a URL HTTPS da API antes de publicar o frontend."
+              exit 1
+            fi
+            echo "next_public_api_url=$DMFLOW_PUBLIC_API_URL" >> "$GITHUB_OUTPUT"
           else
             echo "next_public_api_url=" >> "$GITHUB_OUTPUT"
           fi

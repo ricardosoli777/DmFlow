@@ -29,7 +29,7 @@ Instagram/Meta  --webhook-->  DMFlow Webhook Receiver
 - Responde 200 rápido e empilha o evento numa fila — nunca processa síncrono.
 
 ### 2. Fila de processamento
-- Redis (já existe na VPS) + BullMQ (Node) ou Celery (Python).
+- Redis + BullMQ (Node), incluídos no Docker Compose local.
 - Garante reprocessamento em caso de falha e evita perder eventos em pico.
 
 ### 3. Flow Engine (worker)
@@ -40,7 +40,7 @@ Instagram/Meta  --webhook-->  DMFlow Webhook Receiver
   (máquina de estados por contato+flow).
 - Chama a Instagram Graph API pra enviar a mensagem/botão seguinte.
 
-### 4. Banco de dados (Postgres — reaproveita `pgvector` da VPS)
+### 4. Banco de dados (Postgres)
 Tabelas principais (rascunho):
 - `contacts` (igsid, nome, avatar, tags[], atributos custom, criado_em)
 - `posts_triggers` (post_id, palavra_chave, flow_id, ativo)
@@ -60,9 +60,9 @@ Tabelas principais (rascunho):
 - Inbox de conversas.
 
 ### 7. Storage
-- MinIO (já existe) pra mídias enviadas no fluxo (imagens/vídeos/áudios).
+- MinIO, incluído no Docker Compose local, para mídias do fluxo.
 
-## Stack sugerida (reaproveitando o que já existe na VPS)
+## Stack usada pelo projeto
 
 | Camada | Escolha |
 |---|---|
@@ -71,11 +71,10 @@ Tabelas principais (rascunho):
 | Banco | Postgres (instância dedicada ou compartilhada, schema `dmflow`) |
 | Storage | MinIO (bucket novo `dmflow`) |
 | Frontend | Next.js + React Flow (lib de editor de grafo — usada até pelo próprio n8n) |
-| Deploy | Docker Swarm + Traefik — `dmflow.example.com` (dashboard) e `hooks.example.com` (API/webhook) |
+| Deploy | Docker Compose local ou Docker Swarm + Traefik com domínios definidos pelo instalador |
 
-## Por que reaproveitar a VPS
+## Ambientes
 
-Se você já tem Postgres, Redis, MinIO, Traefik e Swarm rodando e
-monitorados (backup, fail2ban, health-check) numa VPS própria, subir o
-DMFlow como mais um stack Swarm evita provisionar infra nova — só precisa
-de um schema/bucket isolado e um novo serviço no Swarm.
+O Docker Compose da raiz cria serviços próprios de Postgres, Redis e MinIO.
+O exemplo de Docker Swarm em `infra/` também cria esses serviços e exige
+que o instalador configure uma rede externa do Traefik.

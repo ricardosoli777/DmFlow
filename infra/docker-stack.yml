@@ -1,12 +1,11 @@
-# Stack de PRODUÇÃO para Docker Swarm — VPS arkitekt.space.
+# Exemplo de stack de produção para Docker Swarm + Traefik.
 # Diferente do docker-compose.yml da raiz (uso local/dev, usa `build:`),
 # este arquivo só usa imagens já publicadas no GHCR e labels do Traefik já
-# existentes na VPS (rede "Arkitekt", entrypoint "websecure", certresolver
-# "letsencryptresolver" — mesmo padrão dos outros serviços).
+# configurados por variáveis privadas no .env da VPS.
 #
 # IMPORTANTE: os serviços de infra (postgres/redis/minio) usam nomes
 # prefixados com "dmflow-" de propósito. "backend" e "frontend" precisam
-# estar na rede "Arkitekt" (compartilhada com outras stacks da VPS, pro
+# estar na rede externa do Traefik (compartilhada com outras stacks, pro
 # Traefik rotear) — um nome genérico tipo "postgres" colide com o DNS de
 # qualquer outro serviço na mesma rede que tenha esse alias (já aconteceu:
 # havia um serviço "postgres_postgres" de outra stack com alias "postgres"
@@ -58,7 +57,7 @@ services:
         condition: on-failure
 
   migrate:
-    image: ghcr.io/ricardosoli777/dmflow-backend:${DMFLOW_IMAGE_TAG:?DMFLOW_IMAGE_TAG is required}
+    image: ${DMFLOW_IMAGE_REPOSITORY:?DMFLOW_IMAGE_REPOSITORY is required}/dmflow-backend:${DMFLOW_IMAGE_TAG:?DMFLOW_IMAGE_TAG is required}
     command: sh -c "npx prisma migrate deploy --schema=/app/node_modules/@dmflow/db/prisma/schema.prisma && node dist/seed.js"
     environment:
       DATABASE_URL: ${DATABASE_URL}
@@ -71,7 +70,7 @@ services:
         condition: none
 
   backend:
-    image: ghcr.io/ricardosoli777/dmflow-backend:${DMFLOW_IMAGE_TAG:?DMFLOW_IMAGE_TAG is required}
+    image: ${DMFLOW_IMAGE_REPOSITORY:?DMFLOW_IMAGE_REPOSITORY is required}/dmflow-backend:${DMFLOW_IMAGE_TAG:?DMFLOW_IMAGE_TAG is required}
     environment:
       PORT: 4000
       DATABASE_URL: ${DATABASE_URL}
@@ -87,34 +86,34 @@ services:
       META_OAUTH_REDIRECT_URI: ${META_OAUTH_REDIRECT_URI}
       META_OAUTH_PAGE_ID: ${META_OAUTH_PAGE_ID}
       ZERNIO_API_KEY: ${ZERNIO_API_KEY}
-      PUBLIC_API_URL: https://hooks.arkitekt.space
-      PUBLIC_APP_URL: https://dmflow.arkitekt.space
+      PUBLIC_API_URL: ${PUBLIC_API_URL}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL}
       RESEND_API_KEY: ${RESEND_API_KEY}
       GMAIL_USER: ${GMAIL_USER}
       GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD}
       EMAIL_FROM: ${EMAIL_FROM}
     networks:
       - dmflow_internal
-      - Arkitekt
+      - proxy_public
     deploy:
       restart_policy:
         condition: on-failure
       labels:
         - "traefik.enable=true"
-        - "traefik.docker.network=Arkitekt"
-        - "traefik.http.routers.dmflow-hooks.rule=Host(`hooks.arkitekt.space`)"
-        - "traefik.http.routers.dmflow-hooks.entrypoints=websecure"
-        - "traefik.http.routers.dmflow-hooks.tls.certresolver=letsencryptresolver"
+        - "traefik.docker.network=${TRAEFIK_NETWORK}"
+        - "traefik.http.routers.dmflow-hooks.rule=Host(`${DMFLOW_API_HOST}`)"
+        - "traefik.http.routers.dmflow-hooks.entrypoints=${TRAEFIK_ENTRYPOINT}"
+        - "traefik.http.routers.dmflow-hooks.tls.certresolver=${TRAEFIK_CERTRESOLVER}"
         - "traefik.http.routers.dmflow-hooks.service=dmflow-hooks"
         - "traefik.http.services.dmflow-hooks.loadbalancer.server.port=4000"
 
   worker:
-    image: ghcr.io/ricardosoli777/dmflow-worker:${DMFLOW_IMAGE_TAG:?DMFLOW_IMAGE_TAG is required}
+    image: ${DMFLOW_IMAGE_REPOSITORY:?DMFLOW_IMAGE_REPOSITORY is required}/dmflow-worker:${DMFLOW_IMAGE_TAG:?DMFLOW_IMAGE_TAG is required}
     environment:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: redis://dmflow-redis:6379
       META_CREDENTIALS_ENCRYPTION_KEY: ${META_CREDENTIALS_ENCRYPTION_KEY}
-      PUBLIC_API_URL: https://hooks.arkitekt.space
+      PUBLIC_API_URL: ${PUBLIC_API_URL}
     networks:
       - dmflow_internal
     deploy:
@@ -122,18 +121,18 @@ services:
         condition: on-failure
 
   frontend:
-    image: ghcr.io/ricardosoli777/dmflow-frontend:${DMFLOW_IMAGE_TAG:?DMFLOW_IMAGE_TAG is required}
+    image: ${DMFLOW_IMAGE_REPOSITORY:?DMFLOW_IMAGE_REPOSITORY is required}/dmflow-frontend:${DMFLOW_IMAGE_TAG:?DMFLOW_IMAGE_TAG is required}
     networks:
-      - Arkitekt
+      - proxy_public
     deploy:
       restart_policy:
         condition: on-failure
       labels:
         - "traefik.enable=true"
-        - "traefik.docker.network=Arkitekt"
-        - "traefik.http.routers.dmflow.rule=Host(`dmflow.arkitekt.space`)"
-        - "traefik.http.routers.dmflow.entrypoints=websecure"
-        - "traefik.http.routers.dmflow.tls.certresolver=letsencryptresolver"
+        - "traefik.docker.network=${TRAEFIK_NETWORK}"
+        - "traefik.http.routers.dmflow.rule=Host(`${DMFLOW_APP_HOST}`)"
+        - "traefik.http.routers.dmflow.entrypoints=${TRAEFIK_ENTRYPOINT}"
+        - "traefik.http.routers.dmflow.tls.certresolver=${TRAEFIK_CERTRESOLVER}"
         - "traefik.http.routers.dmflow.service=dmflow"
         - "traefik.http.services.dmflow.loadbalancer.server.port=3000"
 
@@ -141,9 +140,10 @@ networks:
   # rede interna, só entre os serviços do DMFlow — não conversa com outras stacks
   dmflow_internal:
     driver: overlay
-  # rede já existente na VPS, usada pelo Traefik pra rotear todo mundo
-  Arkitekt:
+  # rede externa já conectada ao Traefik
+  proxy_public:
     external: true
+    name: ${TRAEFIK_NETWORK}
 
 volumes:
   dmflow_postgres_data:

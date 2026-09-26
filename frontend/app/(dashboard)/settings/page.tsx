@@ -424,16 +424,8 @@ function InstagramAccountCard({ account, zernioKeys }: { account: InstagramAccou
               <div className="border-t border-border p-4">
           <p className="mb-4 text-sm text-muted-foreground">
           Preencha os campos abaixo, na ordem, pra conectar (ou trocar) essa conta — cada um tem um botão que já
-          abre a tela certa da Meta. Deixe em branco o que você não quer alterar. Guia completo em{" "}
-          <a
-            href="https://github.com/ricardosoli777/DmFlow/blob/main/docs/04-integracao-meta.md"
-            target="_blank"
-            rel="noreferrer"
-            className="text-primary underline"
-          >
-            docs/04-integracao-meta.md
-          </a>
-          .
+          abre a tela certa da Meta. Deixe em branco o que você não quer alterar. O guia completo está em
+          docs/04-integracao-meta.md no repositório desta instalação.
           </p>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">

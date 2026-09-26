@@ -1,6 +1,6 @@
 # 07 — Plano de Execução em Waves (Spec-Driven)
 
-Repositório: https://github.com/ricardosoli777/DmFlow
+Repositório: consulte a página onde este código foi publicado.
 
 ## Método
 
@@ -80,7 +80,7 @@ Pré-requisito: Wave 1 completa + Wave 0.3 (app Meta configurado).
   Nenhum DM foi enviado porque não havia trigger cadastrado pro post de
   teste (comportamento correto, RF02).
 - ✅ **Confirmado (2026-09-13):** webhook configurado no painel da Meta
-  apontando pra `https://hooks.arkitekt.space/webhooks/instagram`, tráfego
+  apontando para a URL HTTPS de webhook configurada na instalação, tráfego
   real chegando em produção e worker processando eventos reais da fila
   `instagram-events` (ver detalhes na 6C, Wave 6).
 
@@ -105,7 +105,7 @@ e-mail → tag → fim) rodando 100% via engine, sem código hardcoded.
 
 | Etapa | Entrega | Critério de aceite |
 |---|---|---|
-| 4A — Auth | Login único (usuário/senha ou API key) | Rota protegida rejeita acesso sem sessão válida |
+| 4A — Auth | Cadastro e login separados por links de e-mail | Rota protegida rejeita acesso sem sessão válida |
 | 4B — CRUD de Triggers | Tela criar/editar/pausar trigger | Criar trigger na UI reflete no banco e passa a valer no próximo comentário real |
 | 4C — Editor de Fluxo | Canvas React Flow, salvar grafo como JSON válido pro engine | Fluxo desenhado na UI roda sem erro no engine real (reusa Wave 3) |
 | 4D — Inbox | Lista de conversas + intervenção manual | Consigo ver uma conversa real e mandar mensagem manual que chega no Instagram |
@@ -124,7 +124,7 @@ Ver detalhamento completo em
 |---|---|---|
 | 5A — Dockerfiles | Imagens multi-stage backend/worker/frontend | `docker build` de cada uma sem erro, imagem final <300MB |
 | 5B — docker-compose | Compose completo (postgres, redis, minio, backend, worker, frontend) | `docker compose up -d` sobe tudo saudável (`healthcheck` verde) numa máquina limpa |
-| 5C — CI de imagem | GitHub Actions builda e publica no GHCR a cada release | Tag `v0.1.0` gera imagem pública em `ghcr.io/ricardosoli777/dmflow` |
+| 5C — CI de imagem | GitHub Actions builda e publica no GHCR a cada release | Tag `v0.1.0` gera imagens no namespace do proprietário do repositório |
 | 5D — Onboarding zero-conhecimento | README "Quickstart", `.env.example` comentado, script `setup.sh`/`setup.ps1` | Uma pessoa que nunca viu o projeto segue só o README e sobe o app rodando em <15min |
 
 **Verify da wave:** teste real com uma máquina/pasta limpa (ou peça pra
@@ -141,7 +141,7 @@ pra produção).
 |---|---|---|---|
 | 6A — Stack Swarm | `docker stack deploy -c infra/docker-stack.yml dmflow` usando as imagens do GHCR | Serviço `dmflow_*` aparece `Running` no `docker service ls` | ✅ Feito — todos os 7 serviços `1/1` (migrate `0/1` é esperado, roda uma vez e conclui) |
 | 6B — Traefik + domínio | `dmflow.example.com` (dashboard) + `hooks.example.com` (API/webhook) com HTTPS | Sites acessíveis via HTTPS, certificado válido | ✅ Confirmado: `dmflow.example.com` → HTTP 200, `hooks.example.com/health` → HTTP 200 |
-| 6C — Webhook produção | Webhook da Meta reapontado pra URL de produção | Evento real de comentário processado em produção, ponta a ponta | ✅ Confirmado (2026-09-13) — webhook apontado pra `https://hooks.arkitekt.space/webhooks/instagram`, tráfego real chegando (`GET /settings/instagram`, `GET /contacts` etc. nos logs do backend) e worker processando eventos reais da fila `instagram-events` |
+| 6C — Webhook produção | Webhook da Meta reapontado pra URL de produção | Evento real de comentário processado em produção, ponta a ponta | ✅ Confirmado (2026-09-13) — webhook apontado para a URL HTTPS configurada na instalação, tráfego real chegando e worker processando eventos da fila `instagram-events` |
 
 ### Bugs corrigidos no deploy real (não apareciam em build local)
 

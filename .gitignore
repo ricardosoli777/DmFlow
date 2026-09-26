@@ -24,6 +24,7 @@ npm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+Microsoft/Windows/PowerShell/ModuleAnalysisCache
 
 # docker
 *.pid

@@ -45,7 +45,6 @@ services:
       retries: 10
 
   migrate:
-    image: ghcr.io/ricardosoli777/dmflow-backend:latest
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -56,7 +55,6 @@ services:
         condition: service_healthy
 
   backend:
-    image: ghcr.io/ricardosoli777/dmflow-backend:latest
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -78,7 +76,6 @@ services:
       retries: 10
 
   worker:
-    image: ghcr.io/ricardosoli777/dmflow-worker:latest
     build:
       context: .
       dockerfile: worker/Dockerfile
@@ -93,7 +90,6 @@ services:
         condition: service_completed_successfully
 
   frontend:
-    image: ghcr.io/ricardosoli777/dmflow-frontend:latest
     build:
       context: .
       dockerfile: frontend/Dockerfile

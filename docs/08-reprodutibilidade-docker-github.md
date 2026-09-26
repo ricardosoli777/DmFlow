@@ -1,137 +1,170 @@
-# 08 — Reprodutibilidade via GitHub + Docker
+# 08 — Instalação reproduzível
 
-Objetivo: qualquer pessoa, **sem conhecimento técnico**, clona
-https://github.com/ricardosoli777/DmFlow e sobe o app funcionando com poucos
-comandos, usando a imagem publicada no GitHub.
+Este guia descreve dois caminhos. **Docker Compose local** é o caminho para
+começar: compila as imagens no computador de quem instala e usa
+`http://localhost:3000`. **Docker Swarm + Traefik** é um exemplo avançado
+para quem já administra uma VPS, um domínio e um proxy HTTPS. Nenhuma
+credencial, domínio ou IP da instalação original é necessária.
 
-## Peças necessárias
+## 1. Instalação local com Docker Compose
 
-### 1. Dockerfiles multi-stage (`backend/Dockerfile`, `frontend/Dockerfile`, `worker/Dockerfile`)
-- Stage `build`: instala deps, compila (TypeScript → JS, Next.js build).
-- Stage `runtime`: imagem enxuta (`node:20-alpine`), só o build final + deps
-  de produção.
-- Usuário non-root, `HEALTHCHECK` definido em cada imagem.
+### Pré-requisitos
 
-### 2. `docker-compose.yml` na raiz do repo
-Serviços:
-- `postgres` (com volume persistente)
-- `redis`
-- `minio` (com volume persistente)
-- `backend` (API)
-- `worker` (flow engine)
-- `frontend` (dashboard)
-- Rede interna única; só `frontend`/`backend` expõem porta pro host.
+- Docker Desktop iniciado (Windows/macOS) ou Docker Engine com o plugin
+  Compose v2 (Linux). Confirme com `docker compose version` e `docker info`.
+- Portas 3000 e 4000 disponíveis. O Compose também publica a porta 9001 do
+  console MinIO; altere o mapeamento no `docker-compose.yml` se ela já estiver
+  em uso.
+- Acesso à internet para baixar as imagens base e dependências na primeira
+  compilação. Node.js e PostgreSQL não precisam ser instalados no host.
 
-Cada serviço com `healthcheck` — isso é o que permite ao `docker compose up`
-reportar claramente "subiu tudo certo" pra quem não entende de infra.
+### Preparar o `.env`
 
-### 3. `.env.example`
-Todas as variáveis necessárias, comentadas em português simples:
+1. Baixe o código pela opção **Code → Download ZIP** da página do repositório,
+   extraia o ZIP e abra um terminal na pasta que contém
+   `docker-compose.yml`. Quem usa Git pode clonar a URL mostrada em **Code**.
+2. Execute `powershell -ExecutionPolicy Bypass -File .\setup.ps1` no Windows
+   ou `bash setup.sh` no macOS/Linux. Na primeira execução o script cria
+   `.env` e para para você preenchê-lo.
+3. Abra `.env` e substitua `POSTGRES_PASSWORD` por uma senha longa de
+   letras e números. Substitua **o mesmo texto** da senha dentro de
+   `DATABASE_URL`. Exemplo de formato:
+   `DATABASE_URL=postgresql://dmflow:SUA_SENHA@postgres:5432/dmflow`.
+   Use letras e números para não precisar codificar caracteres reservados na
+   URL.
+4. Gere `JWT_SECRET` e `META_CREDENTIALS_ENCRYPTION_KEY`. Ambos precisam
+   ser diferentes. No macOS/Linux, rode `openssl rand -base64 32` duas vezes
+   e cole cada resultado em uma variável. No PowerShell, rode o bloco abaixo
+   duas vezes:
 
-```env
-# Credenciais da Meta NÃO vão aqui — cada workspace conecta suas contas
-# Instagram direto pelo dashboard, em Configurações (RF17).
+   ```powershell
+   $bytes = New-Object byte[] 32
+   [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+   [Convert]::ToBase64String($bytes)
+   ```
 
-# Banco de dados (gerado automaticamente, não precisa mudar)
-POSTGRES_USER=dmflow
-POSTGRES_PASSWORD=troque_esta_senha
-POSTGRES_DB=dmflow
+5. Para a primeira conta, deixe `DASHBOARD_ADMIN_EMAIL` vazio e use
+   **Criar conta** no aplicativo. Se preencher essa variável com seu próprio
+   e-mail antes da primeira subida, o seed cria a conta e um workspace;
+   nesse caso use **Entrar**, não **Criar conta**.
+6. Para teste local, pode deixar `RESEND_API_KEY`, `GMAIL_USER` e
+   `GMAIL_APP_PASSWORD` vazios. O backend imprimirá o link de confirmação
+   nos logs. Para enviar e-mails reais, configure um provedor conforme
+   [README](../README.md#envio-dos-links-por-e-mail).
 
-# Painel (e-mail que ganha o primeiro workspace — login é por magic-link, sem senha)
-DASHBOARD_ADMIN_EMAIL=voce@exemplo.com
-RESEND_API_KEY=
+Mantenha `PUBLIC_APP_URL=http://localhost:3000`,
+`PUBLIC_API_URL=http://localhost:4000` e
+`NEXT_PUBLIC_API_URL=http://localhost:4000` na instalação local. O
+`NEXT_PUBLIC_API_URL` entra no bundle do frontend durante a compilação:
+se mudar essa variável, reconstrua a imagem.
+
+O arquivo `.env` contém segredos, já está ignorado pelo Git e não deve ser
+enviado a terceiros. `.env.example` contém apenas exemplos.
+
+### Subir e conferir
+
+Rode o mesmo script de setup novamente. Ele valida a configuração do Compose
+e executa `docker compose up --build -d`. O primeiro build pode demorar.
+Em seguida:
+
+```bash
+docker compose ps
+docker compose logs migrate
+docker compose logs backend
 ```
 
-### 4. Script de setup guiado
-`setup.sh` (Linux/Mac) e `setup.ps1` (Windows):
-- Verifica se Docker está instalado (senão, mostra link de instalação).
-- Copia `.env.example` → `.env` se não existir.
-- Roda `docker compose pull` (usa imagem já publicada, não precisa buildar
-  local) + `docker compose up -d`.
-- No final, imprime: "Acesse http://localhost:3000 — login: (o que está no .env)".
+O serviço `migrate` deve terminar com código 0. Backend, worker e frontend
+devem estar em execução. Abra `http://localhost:3000/register`, informe seu
+e-mail e confirme pelo link recebido. Sem provedor configurado, copie o link
+impresso em `docker compose logs backend`. Ele expira em 15 minutos e pode
+ser usado uma vez. Depois do cadastro, use `/login` com o mesmo e-mail.
 
-### 5. GitHub Actions — build e publish da imagem
-`.github/workflows/release.yml`:
-- Dispara em tag `v*.*.*` (ou em cada push na `main`, com tag `:latest`).
-- Builda as 3 imagens (backend, worker, frontend).
-- Publica em `ghcr.io/ricardosoli777/dmflow-backend`,
-  `ghcr.io/ricardosoli777/dmflow-worker`,
-  `ghcr.io/ricardosoli777/dmflow-frontend`.
-- `docker-compose.yml` de produção referencia essas imagens prontas (`image:
-  ghcr.io/...`), então quem clona **não precisa buildar nada** — só puxar.
+Se configurou `DASHBOARD_ADMIN_EMAIL`, a conta já existe: comece em
+`http://localhost:3000/login` e use esse e-mail. Tentar cadastrá-lo
+novamente mostrará que ele já tem conta.
 
-### 6. README com Quickstart (o que a pessoa leiga vai ler)
+O painel pode abrir em localhost sem integração com a Meta. Para receber
+webhooks reais, a API precisa estar acessível por HTTPS público; localhost
+sozinho não recebe chamadas da Meta. Veja
+[integração com Meta](04-integracao-meta.md).
 
-```markdown
-## Como rodar
+### Atualizar, parar e diagnosticar
 
-1. Instale o Docker Desktop: https://www.docker.com/products/docker-desktop
-2. Baixe este repositório (botão verde "Code" → "Download ZIP", ou `git clone`)
-3. Abra a pasta e rode:
-   - Windows: clique duas vezes em `setup.ps1` (ou rode no PowerShell)
-   - Mac/Linux: `./setup.sh`
-4. Rode o script de novo — ele sobe tudo com o `.env` só de infraestrutura
-5. Acesse http://localhost:3000, faça login e cole suas credenciais do Meta
-   em **Configurações** (veja o guia em `docs/04-integracao-meta.md`)
+```bash
+docker compose up --build -d
+docker compose ps
+docker compose logs --tail=100 backend
+docker compose logs --tail=100 frontend
+docker compose logs --tail=100 migrate
+docker compose down
 ```
 
-### 7. Release versionada
-- `CHANGELOG.md` simples por versão.
-- Toda wave concluída com Verify passando vira uma tag (`v0.1.0`, `v0.2.0`...)
-  — assim sempre existe uma imagem "conhecida boa" pra quem for clonar, em
-  vez de depender do estado atual da `main`.
+`docker compose down` para os containers e preserva os volumes de dados.
+Não use `docker compose down -v` se quiser manter banco, Redis e mídias.
+Se a página abrir, mas a API não responder, confirme
+`NEXT_PUBLIC_API_URL` e reconstrua o frontend. Se o banco recusar a
+conexão, confira se a senha em `POSTGRES_PASSWORD` corresponde à senha
+dentro de `DATABASE_URL`. Se a senha do Postgres for alterada após o
+primeiro boot, o volume existente continuará com a senha anterior: use a
+senha original ou faça uma migração de senha no banco.
 
-## ⚠️ Deploy em VPS com outros serviços já rodando (Docker Swarm)
+## 2. VPS própria com Docker Swarm e Traefik
 
-Se você for rodar o `infra/docker-stack.yml` numa VPS que **já tem outros
-serviços** no mesmo Swarm/rede compartilhada (ex: uma rede `minha-rede`
-usada por várias stacks), preste atenção nisso — já mordeu um deploy real
-uma vez:
+Este caminho pressupõe Docker Swarm ativo, Traefik funcionando com uma rede
+overlay externa, dois nomes DNS seus apontando para a VPS e certificados
+HTTPS. Não use o `docker-compose.yml` local como stack Swarm: ele compila
+imagens localmente, enquanto `infra/docker-stack.yml` consome imagens
+publicadas no registro do seu repositório.
 
-**O problema:** o `backend` e o `frontend` do DMFlow precisam estar na rede
-compartilhada (pra o Traefik conseguir rotear `dmflow.example.com` /
-`hooks.example.com`). Mas se você nomear o serviço de banco só de
-`postgres` (ou `redis`, `minio`), e **qualquer outra stack** naquela mesma
-rede também tiver um serviço com esse mesmo nome/alias, o DNS interno do
-Docker fica ambíguo — o backend pode acabar se conectando no banco **errado**
-(de outra stack!) em vez do seu, e o erro que aparece (`the provided
-database credentials ... are not valid`) parece que é senha errada, mas não
-é — é conexão no host errado.
+1. Publique o projeto em um repositório seu. O workflow
+   [release.yml](../.github/workflows/release.yml) produz as imagens
+   `dmflow-backend`, `dmflow-worker` e `dmflow-frontend` no namespace
+   GHCR desse repositório, com tag `sha-<commit-curto>`.
+2. Nas configurações do repositório, crie o secret
+   `DMFLOW_PUBLIC_API_URL` com a URL HTTPS pública da sua API, sem barra
+   final. O frontend precisa desse valor **durante o build**. Quem fizer um
+   fork precisa configurar o próprio secret antes de publicar imagens.
+3. Na VPS, clone seu repositório e crie `.env` a partir de
+   `.env.example`. Gere os segredos como no passo local. Use URLs HTTPS
+   próprias em `PUBLIC_APP_URL` e `PUBLIC_API_URL`, sem barra final.
+   Ajuste `DATABASE_URL` para o hostname `dmflow-postgres` (não
+   `postgres`), mantendo a mesma senha de `POSTGRES_PASSWORD`.
+4. Preencha `DMFLOW_IMAGE_REPOSITORY` com o namespace do seu registro
+   (formato `ghcr.io/SEU_USUARIO`). Preencha `TRAEFIK_NETWORK` com o nome
+   da rede overlay externa conectada ao Traefik,
+   `TRAEFIK_ENTRYPOINT` e `TRAEFIK_CERTRESOLVER` com os nomes usados
+   pela sua configuração do Traefik. Confira que a rede existe com
+   `docker network ls`. Se as imagens GHCR forem privadas, autentique o
+   Docker no registro antes do deploy.
+5. Configure um provedor de e-mail real. Sem ele, os links de cadastro e
+   login só aparecerão nos logs do backend da VPS, o que não serve para
+   usuários externos. Confira que o remetente em `EMAIL_FROM` pertence
+   ao provedor configurado.
+6. Depois de o workflow publicar as imagens, execute na pasta do projeto:
 
-**Por isso** o `infra/docker-stack.yml` usa nomes prefixados
-(`dmflow-postgres`, `dmflow-redis`, `dmflow-minio`) em vez dos genéricos
-`postgres`/`redis`/`minio`. Se for adaptar esse arquivo pra outra VPS com
-outras stacks, **mantenha esse prefixo** (ou troque por outro único seu) —
-nunca use nomes genéricos de serviço de infra numa rede compartilhada.
+   ```bash
+   bash infra/deploy.sh sha-SEU_COMMIT_CURTO
+   docker service ls
+   docker service logs --tail 30 dmflow_migrate
+   ```
 
-O `.env`/`.env.example` na raiz (usado pelo `docker-compose.yml` local, que
-não tem esse problema por rodar isolado) continua usando os nomes simples
-(`postgres`, `redis`, `minio`) — só o `DATABASE_URL`/`REDIS_URL` usados
-dentro do `infra/docker-stack.yml` (via variável de ambiente na VPS)
-precisam apontar pro nome prefixado (`@dmflow-postgres:5432`,
-`redis://dmflow-redis:6379`).
+O script carrega o `.env`, valida variáveis obrigatórias e aplica a stack.
+O serviço `dmflow_migrate` roda uma vez e pode aparecer como `0/1`
+após concluir; confirme nos logs que as migrations terminaram sem erro.
+Verifique a rota `/health` da API e as páginas `/register` e `/login`
+do painel nos **seus** domínios. Cadastre o webhook da Meta com
+`<PUBLIC_API_URL>/webhooks/instagram`.
 
-## ⚠️ Primeira migration commitada (upgrade de instalação já existente)
+Antes de atualizar uma instalação com dados, faça backup do banco e dos
+volumes conforme a política da sua VPS. O script não cria backup.
 
-A migration `20260915120301_workspaces_backfill_default` (parte da wave que
-trouxe multi-conta/workspaces — RF16/RF17) faz uma migração de **dados**, não
-só de schema: numa instalação que já tinha usuário/contatos/flows antes dela,
-cria um workspace "Minha Automação", torna o usuário existente `OWNER` dele,
-migra a linha única `settings.instagram_connection` pra virar a primeira
-`InstagramAccount`, e move contatos/flows/triggers/links existentes pra
-dentro desse workspace. Tudo isso roda **automaticamente** no próximo
-`docker stack deploy`/`docker compose up` (é o serviço `migrate`, que já
-roda `prisma migrate deploy` antes do backend subir) — não precisa de nenhum
-comando manual. Numa instalação nova (banco vazio), essa migration não faz
-nada (não existe usuário ainda nesse ponto do boot).
+## Notas de arquitetura
 
-## Por que isso cumpre o objetivo de "outras pessoas sem conhecimento"
-
-- Ninguém precisa instalar Node, Postgres, Redis — só Docker.
-- Ninguém precisa buildar nada — a imagem já vem pronta do GHCR.
-- Único trabalho manual real é colar as credenciais da Meta em
-  **Configurações** dentro do próprio app (inevitável, são credenciais
-  pessoais de cada conta Instagram) — e isso é guiado pelo
-  `docs/04-integracao-meta.md`.
-- `healthcheck` + script de setup dão feedback claro de sucesso/erro sem
-  precisar ler logs de container.
+- O Compose da raiz cria Postgres, Redis e MinIO próprios. No Swarm os
+  serviços de infraestrutura usam nomes prefixados para evitar colisão de
+  DNS com outras stacks.
+- `docker stack deploy` não lê `.env` automaticamente; o script
+  `infra/deploy.sh` carrega o arquivo antes do comando.
+- A URL pública da API é embutida no JavaScript do navegador. Ela precisa
+  ser alcançável pelos usuários e não deve conter credenciais.
+- O repositório não contém credenciais ou domínios de uma instalação real.

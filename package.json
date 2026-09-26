@@ -2,7 +2,7 @@
   "name": "dmflow",
   "version": "0.1.0",
   "private": true,
-  "description": "Automação de DM do Instagram estilo ManyChat — https://github.com/ricardosoli777/DmFlow",
+  "description": "Automação de mensagens do Instagram com editor visual de fluxos",
   "workspaces": [
     "packages/db",
     "backend",

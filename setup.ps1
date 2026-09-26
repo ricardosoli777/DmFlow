@@ -1,25 +1,49 @@
-# Setup guiado do DMFlow — ver docs/08-reprodutibilidade-docker-github.md
+# Instalação local: compila as imagens com as URLs definidas neste .env.
+$ErrorActionPreference = 'Stop'
+Set-Location $PSScriptRoot
 
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-    Write-Host "Docker nao encontrado. Instale em: https://www.docker.com/products/docker-desktop"
+    Write-Error 'Docker não encontrado. Instale Docker Desktop: https://docs.docker.com/desktop/'
+    exit 1
+}
+docker compose version *> $null
+if ($LASTEXITCODE -ne 0) {
+    Write-Error 'Docker Compose v2 não encontrado. Instale ou atualize o Docker Desktop.'
+    exit 1
+}
+docker info *> $null
+if ($LASTEXITCODE -ne 0) {
+    Write-Error 'Docker não está iniciado. Abra o Docker Desktop e tente novamente.'
     exit 1
 }
 
-if (-not (Test-Path ".env")) {
-    Copy-Item ".env.example" ".env"
-    Write-Host ""
-    Write-Host "Criei o arquivo .env a partir do .env.example."
-    Write-Host "Abra o .env e troque o e-mail/senha do dashboard (DASHBOARD_ADMIN_EMAIL/"
-    Write-Host "DASHBOARD_ADMIN_PASSWORD) e as senhas genericas de banco/fila. Nao precisa"
-    Write-Host "preencher nada da Meta aqui -- isso e feito depois, dentro do app, em"
-    Write-Host "Configuracoes (veja docs/04-integracao-meta.md). Depois rode este script de novo."
+if (-not (Test-Path -LiteralPath '.env')) {
+    Copy-Item -LiteralPath '.env.example' -Destination '.env'
+    Write-Host 'Arquivo .env criado. Edite POSTGRES_PASSWORD e a senha dentro de DATABASE_URL'
+    Write-Host 'com o mesmo valor. Preencha JWT_SECRET e META_CREDENTIALS_ENCRYPTION_KEY.'
+    Write-Host 'Veja os comandos de geração no README. Depois rode este script novamente.'
     exit 0
 }
 
-Write-Host "Subindo o DMFlow..."
-docker compose pull
-docker compose up -d
+$settings = @{}
+foreach ($line in Get-Content -LiteralPath '.env') {
+    if ($line -match '^([A-Za-z_][A-Za-z0-9_]*)=(.*)$') {
+        $settings[$Matches[1]] = $Matches[2]
+    }
+}
+foreach ($name in @('POSTGRES_PASSWORD', 'DATABASE_URL', 'JWT_SECRET', 'META_CREDENTIALS_ENCRYPTION_KEY')) {
+    $value = [string]$settings[$name]
+    if ([string]::IsNullOrWhiteSpace($value) -or $value.Contains('troque_')) {
+        Write-Error "Preencha $name no .env antes de continuar (veja o README)."
+        exit 1
+    }
+}
 
-Write-Host ""
-Write-Host "Pronto! Acesse http://localhost:3000"
-Write-Host "Login: o e-mail/senha definidos em DASHBOARD_ADMIN_EMAIL / DASHBOARD_ADMIN_PASSWORD no .env"
+docker compose config --quiet
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+docker compose up --build -d
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+docker compose ps
+Write-Host 'Acesse http://localhost:3000/register para criar a primeira conta.'
+Write-Host 'Se definiu DASHBOARD_ADMIN_EMAIL, use http://localhost:3000/login com esse e-mail.'
+Write-Host 'Sem provedor de e-mail, o link de confirmação aparece em: docker compose logs backend'
