@@ -4,6 +4,7 @@ import { decryptCredential, encryptCredential } from "@dmflow/db";
 import { env } from "../env";
 import { requireAuth, requireRole } from "../lib/auth";
 import { prisma } from "../lib/prisma";
+import { ensureZernioWebhook } from "../lib/zernio-webhook";
 
 const connectResponse = z.object({ authUrl: z.string().url() });
 const keySlotSchema = z.enum(["primary", "secondary"]);
@@ -21,13 +22,13 @@ class ZernioHttpError extends Error {
   }
 }
 
-async function workspaceApiKey(workspaceId: string, slot: KeySlot = "primary"): Promise<string> {
+export async function workspaceApiKey(workspaceId: string, slot: KeySlot = "primary"): Promise<string> {
   const stored = await prisma.zernioApiKey.findUnique({ where: { workspaceId } });
   if (slot === "secondary") return stored?.secondaryApiKey ? decryptCredential(stored.secondaryApiKey) : "";
   return stored?.apiKey ? decryptCredential(stored.apiKey) : env.ZERNIO_API_KEY;
 }
 
-async function zernio<T>(apiKey: string, path: string, init?: RequestInit): Promise<T> {
+export async function zernio<T>(apiKey: string, path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`https://zernio.com/api/v1${path}`, {
     ...init,
     headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json", ...(init?.headers ?? {}) },
@@ -134,11 +135,14 @@ export async function zernioRoutes(app: FastifyInstance) {
     if (existingInstagram && (existingInstagram.workspaceId !== req.workspaceId || existingInstagram.keySlot !== body.slot)) {
       return reply.status(409).send({ error: "Essa conta Instagram já está vinculada a outra chave do Zernio" });
     }
-    await prisma.zernioConnection.upsert({
+    const connection = await prisma.zernioConnection.upsert({
       where: { workspaceId_keySlot: { workspaceId: req.workspaceId, keySlot: body.slot } },
       update: { profileId: selected.profileId, accountId: selected.accountId, instagramAccountId: body.instagramAccountId, username: selected.username },
       create: { workspaceId: req.workspaceId, keySlot: body.slot, profileId: selected.profileId, accountId: selected.accountId, instagramAccountId: body.instagramAccountId, username: selected.username },
     });
+    await prisma.instagramAccount.update({ where: { id: body.instagramAccountId }, data: { igUsername: selected.username } });
+    try { await ensureZernioWebhook(connection.id); }
+    catch (error) { return reply.status(502).send({ error: `Conta vinculada, mas webhook não ativado: ${(error as Error).message}` }); }
     return { connected: true, accountId: selected.accountId, username: selected.username };
   });
 

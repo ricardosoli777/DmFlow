@@ -130,6 +130,8 @@ model ZernioConnection {
   instagramAccount   InstagramAccount? @relation(fields: [instagramAccountId], references: [id])
   username    String    @default("")
   platform    String    @default("instagram")
+  webhookId   String?
+  webhookSecret String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -157,6 +159,7 @@ model Contact {
   instagramAccountId String?
   instagramAccount   InstagramAccount? @relation(fields: [instagramAccountId], references: [id])
   igsid              String
+  zernioConversationId String?
   name               String?
   username           String?
   avatarUrl          String?
@@ -171,7 +174,7 @@ model Contact {
 
   // igsid é único por Instagram Business (não globalmente) — a mesma pessoa
   // real pode comentar em contas de workspaces diferentes.
-  @@unique([workspaceId, igsid])
+  @@unique([instagramAccountId, igsid])
   @@map("contacts")
 }
 
@@ -208,6 +211,7 @@ model FlowTemplate {
 model PostTrigger {
   id              String    @id @default(uuid())
   workspaceId     String
+  instagramAccountId String?
   workspace       Workspace @relation(fields: [workspaceId], references: [id])
   // "comment" (comentário em post/reel, exige postId) | "dm_keyword" (DM direta
   // com palavra-chave, sem post associado)

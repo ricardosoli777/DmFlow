@@ -16,6 +16,11 @@ export async function messageRoutes(app: FastifyInstance) {
     const contact = await prisma.contact.findUnique({ where: { id } });
     if (!contact || contact.workspaceId !== req.workspaceId) return reply.status(404).send({ error: "not found" });
 
+    if (contact.instagramAccountId && !contact.zernioConversationId) {
+      const connection = await prisma.zernioConnection.findUnique({ where: { instagramAccountId: contact.instagramAccountId } });
+      if (connection) return reply.status(409).send({ error: "A pessoa ainda não abriu uma conversa por DM. No Zernio, aguarde ela responder à primeira mensagem privada antes de enviar pela Inbox." });
+    }
+
     await manualSendQueue.add("send", { contactId: id, text: body.content });
     return reply.status(202).send({ queued: true });
   });

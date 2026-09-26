@@ -49,7 +49,7 @@ async function health() {
 
 describe("dashboard connection health", () => {
   it("uses the Zernio API check for an account linked through Zernio", async () => {
-    mocks.findConnection.mockResolvedValue([{ instagramAccountId: "instagram-1", accountId: "zernio-1", keySlot: "primary", username: "example" }]);
+    mocks.findConnection.mockResolvedValue([{ instagramAccountId: "instagram-1", accountId: "zernio-1", keySlot: "primary", username: "example", webhookId: "webhook-1" }]);
     expect(await health()).toEqual({
       id: "instagram-1",
       igUsername: "example",
@@ -64,14 +64,14 @@ describe("dashboard connection health", () => {
   });
 
   it("keeps a linked account visible but flags a temporary Zernio validation failure", async () => {
-    mocks.findConnection.mockResolvedValue([{ instagramAccountId: "instagram-1", accountId: "zernio-2", keySlot: "secondary", username: "example" }]);
+    mocks.findConnection.mockResolvedValue([{ instagramAccountId: "instagram-1", accountId: "zernio-2", keySlot: "secondary", username: "example", webhookId: "webhook-2" }]);
     mocks.checkZernio.mockResolvedValue({ connected: false, error: "Não foi possível validar a conexão com o Zernio" });
     expect(await health()).toEqual({
       id: "instagram-1",
       igUsername: "example",
       connectionMethod: "zernio",
       zernioKeySlot: "secondary",
-      connected: true,
+      connected: false,
       providerHealthy: false,
       username: "example",
       error: "Não foi possível validar a conexão com o Zernio",

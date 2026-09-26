@@ -3,6 +3,7 @@ import { Worker } from "bullmq";
 import { advanceFlowRun } from "./engine/executor";
 import { extractAccountIgUserId, parseMetaPayload } from "./engine/parse-meta-payload";
 import { resolveEvent } from "./engine/resolve-event";
+import { parseZernioComment, parseZernioPayload } from "./engine/parse-zernio-payload";
 import { connection } from "./lib/queue";
 import { checkSendRateLimit, sendDirectMessage } from "./services/instagram";
 
@@ -16,6 +17,25 @@ const worker = new Worker(
     const { eventId } = job.data as { eventId: string };
     const raw = await prisma.rawEvent.findUniqueOrThrow({ where: { id: eventId } });
     if (raw.processed) return;
+
+    if (["message.received", "comment.received"].includes((raw.payload as any)?.event)) {
+      const inbound = parseZernioPayload(raw.payload) ?? parseZernioComment(raw.payload);
+      if (inbound) {
+        const connection = await prisma.zernioConnection.findUnique({
+          where: { accountId: inbound.accountId }, include: { instagramAccount: true },
+        });
+        if (!connection?.instagramAccount || connection.workspaceId !== raw.workspaceId) {
+          throw new Error(`Conta Zernio ${inbound.accountId} não vinculada ao evento`);
+        }
+        const sender = "sender" in inbound ? inbound.sender : inbound.author;
+        await resolveEvent(inbound.event, connection.instagramAccount, {
+          ...("conversationId" in inbound ? { conversationId: inbound.conversationId } : {}),
+          name: sender.name, username: sender.username, avatarUrl: sender.picture ?? undefined,
+        });
+      }
+      await prisma.rawEvent.update({ where: { id: eventId }, data: { processed: true } });
+      return;
+    }
 
     // RF17 — resolve a qual conta/workspace esse evento pertence a partir
     // do `entry[].id` do payload, ANTES de processar qualquer coisa — sem

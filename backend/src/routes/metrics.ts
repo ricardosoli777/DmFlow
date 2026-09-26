@@ -90,7 +90,7 @@ export async function metricsRoutes(app: FastifyInstance) {
           connectionMethod: zernioConnection ? "zernio" : "meta",
           ...(zernioConnection ? { zernioKeySlot: zernioConnection.keySlot } : {}),
           ...(zernioConnection
-            ? { connected: true, providerHealthy: zernioStatus?.connected ?? false, username: zernioStatus?.username ?? zernioConnection.username, error: zernioStatus?.error }
+            ? { connected: Boolean(zernioConnection.webhookId && zernioStatus?.connected), providerHealthy: zernioStatus?.connected ?? false, username: zernioStatus?.username ?? zernioConnection.username, error: !zernioConnection.webhookId ? "Webhook Zernio não ativado" : zernioStatus?.error }
             : await checkInstagramConnection(a.pageAccessToken, a.igUserId, a.graphApiVersion)),
         };
       }),

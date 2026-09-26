@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@dmflow/db", () => {
-  const prisma = { flowRun: { findUniqueOrThrow: vi.fn(), update: vi.fn() } };
+  const prisma = { flowRun: { findUniqueOrThrow: vi.fn(), update: vi.fn() }, zernioConnection: { findUnique: vi.fn() } };
   return { getPrisma: () => prisma };
 });
 
@@ -99,5 +99,22 @@ describe("advanceFlowRun — pausa/retomada agendada (RF05, node delay)", () => 
       where: { id: "run-1" },
       data: { currentNode: "n3", status: "done" },
     });
+  });
+
+  it("após private reply Zernio espera a primeira DM antes do próximo node", async () => {
+    const prisma = mockRun("n1");
+    const original = await prisma.flowRun.findUniqueOrThrow();
+    prisma.flowRun.findUniqueOrThrow.mockResolvedValue({
+      ...original,
+      context: { originCommentId: "comment-1", originPostId: "post-1", pendingPrivateReply: true },
+      flow: { definition: { nodes: [{ id: "n1", type: "message", text: "Oi" }, { id: "n2", type: "message" }] } },
+    });
+    prisma.zernioConnection.findUnique.mockResolvedValue({ id: "connection-1" });
+    vi.mocked(nodeHandlers.message).mockResolvedValue({ nextNodeId: "n2", waitingForInput: false });
+
+    await advanceFlowRun("run-1");
+
+    expect(prisma.flowRun.update).toHaveBeenCalledWith({ where: { id: "run-1" }, data: { currentNode: "n2", status: "waiting" } });
+    expect(nodeHandlers.message).toHaveBeenCalledTimes(1);
   });
 });

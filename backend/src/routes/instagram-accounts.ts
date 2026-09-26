@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { requireRole } from "../lib/auth";
 import { prisma } from "../lib/prisma";
+import { removeZernioWebhook } from "../lib/zernio-webhook";
 
 const updateSchema = z.object({
   appId: z.string().min(1).optional(),
@@ -30,7 +31,7 @@ export async function instagramAccountRoutes(app: FastifyInstance) {
         hasVerifyToken: Boolean(a.verifyToken),
         hasPageAccessToken: Boolean(a.pageAccessToken),
         ...(await checkInstagramConnection(a.pageAccessToken, a.igUserId, a.graphApiVersion)),
-        ...(await prisma.zernioConnection.findFirst({ where: { instagramAccountId: a.id, workspaceId: req.workspaceId } }).then((connection) => connection ? { connected: true, username: connection.username, connectionMethod: "zernio", zernioKeySlot: connection.keySlot } : {})),
+        ...(await prisma.zernioConnection.findFirst({ where: { instagramAccountId: a.id, workspaceId: req.workspaceId } }).then((connection) => connection ? { connected: Boolean(connection.webhookId), username: connection.username, connectionMethod: "zernio", zernioKeySlot: connection.keySlot, ...(!connection.webhookId ? { error: "Webhook Zernio ainda não ativado" } : {}) } : {})),
       })),
     );
     return withStatus;
@@ -72,6 +73,11 @@ export async function instagramAccountRoutes(app: FastifyInstance) {
       const existing = await prisma.instagramAccount.findUnique({ where: { id } });
       if (!existing || existing.workspaceId !== req.workspaceId) return reply.status(404).send({ error: "not found" });
 
+      const connection = await prisma.zernioConnection.findUnique({ where: { instagramAccountId: id } });
+      if (connection) {
+        try { await removeZernioWebhook(connection.id); }
+        catch (error) { return reply.status(502).send({ error: `Conta não removida: ${(error as Error).message}` }); }
+      }
       await prisma.$transaction([
         prisma.zernioConnection.deleteMany({ where: { workspaceId: req.workspaceId, instagramAccountId: id } }),
         prisma.instagramAccount.delete({ where: { id } }),

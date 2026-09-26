@@ -4,6 +4,7 @@ import { assertCredentialsEncryptionKey, encryptStoredInstagramCredentials } fro
 import Fastify from "fastify";
 import { env } from "./env";
 import { requireAuth } from "./lib/auth";
+import { activatePendingZernioWebhooks } from "./lib/zernio-webhook";
 import { authRoutes } from "./routes/auth";
 import { contactRoutes } from "./routes/contacts";
 import { flowRoutes } from "./routes/flows";
@@ -68,6 +69,7 @@ async function bootstrap() {
   });
 
   await app.listen({ port: env.PORT, host: "0.0.0.0" });
+  void activatePendingZernioWebhooks();
 }
 
 bootstrap().catch((err) => {

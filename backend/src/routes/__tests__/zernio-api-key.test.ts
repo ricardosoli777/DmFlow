@@ -8,17 +8,20 @@ const mocks = vi.hoisted(() => ({
   findConnection: vi.fn(),
   upsertConnection: vi.fn(),
   findInstagramAccount: vi.fn(),
+  updateInstagramAccount: vi.fn(),
 }));
 
 vi.mock("../../lib/prisma", () => ({
   prisma: {
     zernioApiKey: { findUnique: mocks.findKey, upsert: mocks.upsertKey },
     zernioConnection: { findUnique: mocks.findConnection, upsert: mocks.upsertConnection },
-    instagramAccount: { findFirst: mocks.findInstagramAccount },
+    instagramAccount: { findFirst: mocks.findInstagramAccount, update: mocks.updateInstagramAccount },
   },
 }));
 
 vi.mock("../../env", () => ({ env: { ZERNIO_API_KEY: "" } }));
+
+vi.mock("../../lib/zernio-webhook", () => ({ ensureZernioWebhook: vi.fn().mockResolvedValue(undefined) }));
 
 vi.mock("../../lib/auth", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../lib/auth")>();
@@ -42,8 +45,9 @@ beforeEach(() => {
   mocks.findKey.mockReset().mockResolvedValue(null);
   mocks.upsertKey.mockReset().mockResolvedValue({});
   mocks.findConnection.mockReset().mockResolvedValue(null);
-  mocks.upsertConnection.mockReset().mockResolvedValue({});
+  mocks.upsertConnection.mockReset().mockResolvedValue({ id: "connection-2" });
   mocks.findInstagramAccount.mockReset().mockResolvedValue({ id: "instagram-2" });
+  mocks.updateInstagramAccount.mockReset().mockResolvedValue({});
 });
 
 afterEach(() => {

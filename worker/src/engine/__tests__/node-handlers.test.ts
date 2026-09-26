@@ -74,7 +74,7 @@ describe("nodeHandlers — RF05 (um comportamento isolado por tipo de node)", ()
       text: "Você já é cliente?",
       options: [{ label: "Sim", next: "n2" }],
     };
-    const result = await nodeHandlers.message({ node, run, contact, account, privateReply: { commentId: "c1" } });
+    const result = await nodeHandlers.message({ node, run, contact, account, privateReply: { postId: "p1", commentId: "c1" } });
 
     expect(sendPrivateReply).not.toHaveBeenCalled(); // options presentes => não é texto puro, vai por DM normal
     expect(sendDirectMessage).toHaveBeenCalledWith(account, contact, "Você já é cliente?", [
@@ -85,9 +85,9 @@ describe("nodeHandlers — RF05 (um comportamento isolado por tipo de node)", ()
 
   it("message: texto puro do primeiro node de um comentário sai por Private Reply", async () => {
     const node: FlowNode = { id: "n1", type: "message", text: "Oi! Vou te mandar o link", next: "n2" };
-    const result = await nodeHandlers.message({ node, run, contact, account, privateReply: { commentId: "c1" } });
+    const result = await nodeHandlers.message({ node, run, contact, account, privateReply: { postId: "p1", commentId: "c1" } });
 
-    expect(sendPrivateReply).toHaveBeenCalledWith(account, "c1", contact, "Oi! Vou te mandar o link");
+    expect(sendPrivateReply).toHaveBeenCalledWith(account, "p1", "c1", contact, "Oi! Vou te mandar o link");
     expect(sendDirectMessage).not.toHaveBeenCalled();
     expect(result).toEqual({ nextNodeId: "n2", waitingForInput: false });
   });

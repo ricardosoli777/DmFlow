@@ -76,8 +76,8 @@ export default function OverviewPage() {
             <HealthCard
               key={a.id}
               title={a.igUsername || a.username ? `Conexão — @${a.igUsername || a.username}` : "Conexão com o Instagram"}
-              ok={a.connectionMethod === "zernio" && !a.providerHealthy ? null : a.connected}
-              okText={a.connectionMethod === "zernio" ? a.providerHealthy ? `Conta encontrada no Zernio — chave ${a.zernioKeySlot === "secondary" ? "2" : "1"}` : `Conta vinculada (chave ${a.zernioKeySlot === "secondary" ? "2" : "1"}); ${a.error ?? "aguardando validação do Zernio"}` : a.username ? `Conectado como @${a.username} via Meta` : "Conectado via Meta"}
+              ok={a.connected}
+              okText={a.connectionMethod === "zernio" ? `Conta e webhook ativos no Zernio — chave ${a.zernioKeySlot === "secondary" ? "2" : "1"}` : a.username ? `Conectado como @${a.username} via Meta` : "Conectado via Meta"}
               badText={a.error ?? "Sem resposta da Graph API"}
             />
           ))}
@@ -99,7 +99,7 @@ export default function OverviewPage() {
             title="Último evento recebido"
             ok={health?.lastEventAt ? true : null}
             okText={health?.lastEventAt ? new Date(health.lastEventAt).toLocaleString("pt-BR") : "—"}
-            badText="Nenhum evento recebido ainda — verifique o webhook no painel da Meta"
+            badText="Nenhum evento recebido ainda — verifique o webhook da Meta ou do Zernio"
           />
         </div>
       </div>

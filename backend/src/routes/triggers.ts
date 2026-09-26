@@ -11,6 +11,7 @@ const createSchema = z
     keyword: z.string().optional(),
     publicReplyText: z.string().optional(),
     flowId: z.string().uuid(),
+    instagramAccountId: z.string().uuid().optional(),
   })
   .refine((body) => body.type !== "comment" || !!body.postId, {
     message: "postId é obrigatório pra trigger de comentário",
@@ -27,6 +28,7 @@ const updateSchema = z.object({
   postId: z.string().nullable().optional(),
   publicReplyText: z.string().nullable().optional(),
   flowId: z.string().uuid().optional(),
+  instagramAccountId: z.string().uuid().optional(),
 });
 
 // RF09 — CRUD de triggers (comentário em post/reel ou DM com palavra-chave -> flow)
@@ -57,9 +59,24 @@ export async function triggerRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: "Fluxo não encontrado neste workspace" });
     }
 
+    if (body.instagramAccountId && !(await prisma.instagramAccount.findFirst({ where: { id: body.instagramAccountId, workspaceId: req.workspaceId } }))) {
+      return reply.status(400).send({ error: "Conta Instagram não encontrada neste workspace" });
+    }
+    if (body.type === "comment" && body.instagramAccountId) {
+      const zernioConnection = await prisma.zernioConnection.findUnique({ where: { instagramAccountId: body.instagramAccountId } });
+      if (zernioConnection) {
+        const definition = flow.definition as { start?: string; nodes?: Array<{ id: string; type: string; options?: unknown[] }> };
+        const first = definition.nodes?.find((node) => node.id === definition.start);
+        if (first?.type !== "message" || (Array.isArray(first.options) && first.options.length > 0)) {
+          return reply.status(422).send({ error: "No Zernio, um fluxo iniciado por comentário deve começar com uma mensagem de texto sem botões. As próximas mensagens são enviadas depois que a pessoa responder." });
+        }
+      }
+    }
+
     const trigger = await prisma.postTrigger.create({
       data: {
         workspaceId: req.workspaceId,
+        instagramAccountId: body.instagramAccountId,
         type: body.type,
         postId: body.postId,
         keyword: body.keyword,
@@ -76,6 +93,10 @@ export async function triggerRoutes(app: FastifyInstance) {
 
     const existing = await prisma.postTrigger.findUnique({ where: { id } });
     if (!existing || existing.workspaceId !== req.workspaceId) return reply.status(404).send({ error: "not found" });
+
+    if (body.instagramAccountId && !(await prisma.instagramAccount.findFirst({ where: { id: body.instagramAccountId, workspaceId: req.workspaceId } }))) {
+      return reply.status(400).send({ error: "Conta Instagram não encontrada neste workspace" });
+    }
 
     return prisma.postTrigger.update({ where: { id }, data: body });
   });
@@ -99,9 +120,14 @@ export async function triggerRoutes(app: FastifyInstance) {
     const trigger = await prisma.postTrigger.findUnique({ where: { id } });
     if (!trigger || trigger.workspaceId !== req.workspaceId) return reply.status(404).send({ error: "not found" });
 
-    const account = await prisma.instagramAccount.findFirst({ where: { workspaceId: req.workspaceId } });
+    const account = trigger.instagramAccountId
+      ? await prisma.instagramAccount.findFirst({ where: { id: trigger.instagramAccountId, workspaceId: req.workspaceId } })
+      : await prisma.instagramAccount.findFirst({ where: { workspaceId: req.workspaceId } });
     if (!account) {
       return reply.status(400).send({ error: "Conecte uma conta Instagram em Configurações antes de testar" });
+    }
+    if (await prisma.zernioConnection.findUnique({ where: { instagramAccountId: account.id } })) {
+      return reply.status(422).send({ error: "Teste sintético não consegue simular uma conversa real do Zernio. Envie uma DM ou comentário de uma conta de teste e acompanhe o evento na Visão Geral." });
     }
 
     const testIgsid = `test-${trigger.id}-${Date.now()}`;

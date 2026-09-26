@@ -27,7 +27,7 @@ export type InstagramEvent = CommentEvent | MessageEvent;
 // cru, e marca a abertura da janela de 24h de mensagens. RF17: `account` já
 // vem resolvida (worker/src/index.ts, a partir do `entry[].id` do payload) —
 // é ela que dá o workspace de tudo daqui pra baixo.
-export async function resolveEvent(event: InstagramEvent, account: InstagramAccount): Promise<void> {
+export async function resolveEvent(event: InstagramEvent, account: InstagramAccount, inbound?: { conversationId?: string; name?: string; username?: string; avatarUrl?: string }): Promise<void> {
   // Comentário do próprio dono da conta (ex: teste manual) nunca deve virar
   // contato nem disparar flow — a Meta recusaria a DM de qualquer forma, mas
   // filtrar aqui evita ruído em contacts/flow_runs e uma chamada de API que
@@ -35,14 +35,15 @@ export async function resolveEvent(event: InstagramEvent, account: InstagramAcco
   if (event.kind === "comment" && event.fromIgsid === account.igUserId) return;
 
   let contact = await prisma.contact.upsert({
-    where: { workspaceId_igsid: { workspaceId: account.workspaceId, igsid: event.fromIgsid } },
-    update: { lastInboundAt: new Date(), instagramAccountId: account.id },
+    where: { instagramAccountId_igsid: { instagramAccountId: account.id, igsid: event.fromIgsid } },
+    update: { lastInboundAt: new Date(), instagramAccountId: account.id, ...(inbound ? { zernioConversationId: inbound.conversationId, name: inbound.name, username: inbound.username, avatarUrl: inbound.avatarUrl } : {}) },
     create: {
       workspaceId: account.workspaceId,
       instagramAccountId: account.id,
       igsid: event.fromIgsid,
       name: "fromName" in event ? event.fromName : undefined,
       lastInboundAt: new Date(),
+      ...(inbound ? { zernioConversationId: inbound.conversationId, name: inbound.name, username: inbound.username, avatarUrl: inbound.avatarUrl } : {}),
     },
   });
 
@@ -60,7 +61,7 @@ export async function resolveEvent(event: InstagramEvent, account: InstagramAcco
   }
 
   if (event.kind === "comment") {
-    const trigger = await findCommentTrigger(account.workspaceId, event.postId, event.text);
+    const trigger = await findCommentTrigger(account.workspaceId, account.id, event.postId, event.text);
     // Guarda o comentário mesmo sem match, pra aparecer no histórico/dashboard
     // ("o que a pessoa falou") — não dispara nada, só registro (RF02).
     await prisma.message.create({ data: { contactId: contact.id, direction: "inbound", content: event.text } });
@@ -70,13 +71,14 @@ export async function resolveEvent(event: InstagramEvent, account: InstagramAcco
       // "Growth tool" tipo ManyChat: responde publicamente no comentário
       // (prova social) antes de seguir com a automação em privado. Erro aqui
       // não deve travar o fluxo — só loga.
-      await sendPublicCommentReply(account, event.commentId, interpolate(trigger.publicReplyText, contact)).catch(
+      await sendPublicCommentReply(account, event.postId, event.commentId, interpolate(trigger.publicReplyText, contact)).catch(
         (err) => console.error(`[worker] resposta pública do trigger ${trigger.id} falhou:`, (err as Error).message),
       );
     }
 
     await startFlowRun(contact.id, trigger, {
       originCommentId: event.commentId,
+      originPostId: event.postId,
       // `pendingPrivateReply` faz o primeiro node de texto puro (sem CTA)
       // sair via Private Reply em vez de DM direta — ver node-handlers.ts.
       pendingPrivateReply: true,
@@ -95,7 +97,7 @@ export async function resolveEvent(event: InstagramEvent, account: InstagramAcco
   if (!run) {
     // Sem flow_run ativo: talvez seja uma DM "fria" com palavra-chave de trigger.
     if (event.kind === "message") {
-      await tryStartFromDmKeyword(account.workspaceId, contact.id, event.text);
+      await tryStartFromDmKeyword(account.workspaceId, account.id, contact.id, event.text);
     }
     return;
   }
@@ -114,11 +116,12 @@ export async function resolveEvent(event: InstagramEvent, account: InstagramAcco
 // mesmo post, a palavra-chave específica tem prioridade sobre o "qualquer".
 async function findCommentTrigger(
   workspaceId: string,
+  accountId: string,
   postId: string,
   text: string,
 ): Promise<{ id: string; flowId: string; publicReplyText: string | null } | null> {
   const candidates = await prisma.postTrigger.findMany({
-    where: { workspaceId, type: "comment", postId, active: true },
+    where: { workspaceId, type: "comment", postId, active: true, OR: [{ instagramAccountId: accountId }, { instagramAccountId: null }] },
   });
 
   const byKeyword = candidates.find(
@@ -131,9 +134,9 @@ async function findCommentTrigger(
 
 // RF (novo) — trigger de "DM com palavra-chave": dispara um flow pra quem manda
 // DM direta contendo a palavra, sem precisar ter comentado em nenhum post.
-async function tryStartFromDmKeyword(workspaceId: string, contactId: string, text: string): Promise<void> {
+async function tryStartFromDmKeyword(workspaceId: string, accountId: string, contactId: string, text: string): Promise<void> {
   const candidates = await prisma.postTrigger.findMany({
-    where: { workspaceId, type: "dm_keyword", active: true, keyword: { not: null } },
+    where: { workspaceId, type: "dm_keyword", active: true, keyword: { not: null }, OR: [{ instagramAccountId: accountId }, { instagramAccountId: null }] },
   });
 
   const trigger = candidates.find((t) => text.toLowerCase().includes((t.keyword ?? "").toLowerCase()));

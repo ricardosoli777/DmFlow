@@ -69,7 +69,7 @@ type HandlerArgs = {
    * comum, porque a Meta pode recusar abrir uma conversa nova via envio
    * direto. Ver worker/src/engine/executor.ts.
    */
-  privateReply?: { commentId: string };
+  privateReply?: { commentId: string; postId: string };
 };
 
 /**
@@ -106,10 +106,10 @@ async function sendText(
   contact: Contact,
   text: string,
   actions: ButtonAction[],
-  privateReply?: { commentId: string },
+  privateReply?: { commentId: string; postId: string },
 ): Promise<void> {
   if (privateReply && actions.length === 0) {
-    await sendPrivateReply(account, privateReply.commentId, contact, text);
+    await sendPrivateReply(account, privateReply.postId, privateReply.commentId, contact, text);
     return;
   }
   await sendDirectMessage(account, contact, text, actions);

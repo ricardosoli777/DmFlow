@@ -1,5 +1,5 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { listAllInstagramAccounts } from "@dmflow/db";
+import { decryptCredential, listAllInstagramAccounts } from "@dmflow/db";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma";
 import { instagramEventsQueue } from "../lib/queue";
@@ -11,6 +11,38 @@ import { instagramEventsQueue } from "../lib/queue";
 // worker/src/index.ts). Aqui só precisa confirmar que a chamada é
 // autêntica, testando contra TODAS as contas conectadas.
 export async function webhookRoutes(app: FastifyInstance) {
+  app.post("/webhooks/zernio/:connectionId", async (req, reply) => {
+    const { connectionId } = req.params as { connectionId: string };
+    const connection = await prisma.zernioConnection.findUnique({ where: { id: connectionId } });
+    const rawBody = (req as any).rawBody as Buffer | undefined;
+    const signature = req.headers["x-zernio-signature"] as string | undefined;
+    if (!connection?.webhookSecret || !connection.instagramAccountId || !rawBody || !signature) {
+      return reply.status(401).send({ error: "invalid signature" });
+    }
+    const expected = createHmac("sha256", decryptCredential(connection.webhookSecret)).update(rawBody).digest("hex");
+    const given = Buffer.from(signature, "utf8");
+    const valid = given.length === expected.length && timingSafeEqual(given, Buffer.from(expected));
+    if (!valid) return reply.status(401).send({ error: "invalid signature" });
+
+    const payload = req.body as { id?: string; event?: string; account?: { accountId?: string; id?: string } };
+    if (payload.event === "webhook.test") return reply.send({ received: true });
+    if (payload.event !== "message.received" && payload.event !== "comment.received") return reply.send({ received: true, ignored: true });
+    if ((payload.account?.accountId ?? payload.account?.id) !== connection.accountId || !payload.id) {
+      return reply.status(400).send({ error: "account mismatch" });
+    }
+    const dedupeKey = `zernio:${payload.id}`;
+    let event = await prisma.rawEvent.findUnique({ where: { dedupeKey } });
+    if (!event) {
+      try {
+        event = await prisma.rawEvent.create({ data: { payload: payload as any, workspaceId: connection.workspaceId, dedupeKey } });
+      } catch (error) {
+        if ((error as { code?: string }).code !== "P2002") throw error;
+        event = await prisma.rawEvent.findUniqueOrThrow({ where: { dedupeKey } });
+      }
+    }
+    if (!event.processed) await instagramEventsQueue.add("process-event", { eventId: event.id }, { jobId: event.id });
+    return reply.send({ received: true });
+  });
   // Verificação inicial do webhook (challenge da Meta)
   app.get("/webhooks/instagram", async (req, reply) => {
     const query = req.query as Record<string, string>;

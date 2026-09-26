@@ -1,7 +1,8 @@
 // Envio real via Instagram Messaging API — RF03, RNF01, RNF09.
 // Docs: docs/04-integracao-meta.md
+import { createHash } from "node:crypto";
 import type { Contact, InstagramAccount } from "@dmflow/db";
-import { getPrisma } from "@dmflow/db";
+import { decryptCredential, getPrisma } from "@dmflow/db";
 import { connection } from "../lib/queue";
 
 const prisma = getPrisma();
@@ -89,7 +90,8 @@ export async function sendDirectMessage(
   if (!(await ensureWithinWindow(contact, text))) return;
 
   try {
-    await callSend(account, contact.igsid, { text });
+    if (await isZernioAccount(account)) await callZernioSend(account, contact, { message: text });
+    else await callSend(account, contact.igsid, { text });
     await logOutbound(contact, text);
   } catch (err) {
     await logOutbound(contact, text, "failed", (err as Error).message);
@@ -114,6 +116,13 @@ export async function sendButtonsMessage(
   const logContent = `${text} [botões: ${options.map((o) => o.title).join(", ")}]`;
   try {
     const hasUrl = options.some((o) => o.type === "url");
+    if (await isZernioAccount(account)) {
+      await callZernioSend(account, contact, hasUrl
+        ? { message: text, buttons: options.slice(0, 3).map((o) => o.type === "url" ? { type: "url", title: o.title, url: o.url } : { type: "postback", title: o.title, payload: o.payload }) }
+        : { message: text, quickReplies: options.slice(0, 13).map((o) => ({ title: o.title, payload: o.type === "next" ? o.payload : "" })) });
+      await logOutbound(contact, logContent);
+      return;
+    }
     if (hasUrl) {
       await callSend(account, contact.igsid, {
         attachment: {
@@ -174,6 +183,12 @@ export async function sendMediaMessage(
 
   const logContent = `[${mediaType}] ${url}${options?.length ? ` [botões: ${options.map((o) => o.title).join(", ")}]` : ""}`;
   try {
+    if (await isZernioAccount(account)) {
+      await callZernioSend(account, contact, { attachmentUrl: url, attachmentType: mediaType });
+      if (options?.length) await sendButtonsMessage(account, contact, "Escolha uma opção:", options);
+      await logOutbound(contact, logContent);
+      return;
+    }
     await callSend(account, contact.igsid, message);
     await logOutbound(contact, logContent);
 
@@ -204,12 +219,18 @@ export async function sendMediaMessage(
  */
 export async function sendPrivateReply(
   account: InstagramAccount,
+  postId: string,
   commentId: string,
   contact: Contact,
   text: string,
 ): Promise<void> {
   try {
+    if (await isZernioAccount(account)) {
+      await callZernio(account, `/inbox/comments/${encodeURIComponent(postId)}/${encodeURIComponent(commentId)}/private-reply`,
+        { message: text });
+    } else {
     await callGraphApi(account, `/${commentId}/private_replies`, { message: text });
+    }
     await logOutbound(contact, text);
   } catch (err) {
     await logOutbound(contact, text, "failed", (err as Error).message);
@@ -222,8 +243,11 @@ export async function sendPrivateReply(
  * Usado opcionalmente antes de abrir o fluxo de DM, se o trigger tiver uma
  * resposta pública configurada.
  */
-export async function sendPublicCommentReply(account: InstagramAccount, commentId: string, text: string): Promise<void> {
-  await callGraphApi(account, `/${commentId}/replies`, { message: text });
+export async function sendPublicCommentReply(account: InstagramAccount, postId: string, commentId: string, text: string): Promise<void> {
+  if (await isZernioAccount(account)) {
+    const idempotencyKey = createHash("sha256").update(`${account.id}:${commentId}:${text}`).digest("hex");
+    await callZernio(account, `/inbox/comments/${encodeURIComponent(postId)}`, { message: text, commentId }, idempotencyKey);
+  } else await callGraphApi(account, `/${commentId}/replies`, { message: text });
 }
 
 /**
@@ -288,6 +312,17 @@ export async function checkSendRateLimit(account: InstagramAccount): Promise<{ a
  * API não respondeu o campo.
  */
 export async function checkFollowStatus(account: InstagramAccount, igsid: string): Promise<boolean> {
+  if (await isZernioAccount(account)) {
+    const connection = await prisma.zernioConnection.findUniqueOrThrow({ where: { instagramAccountId: account.id } });
+    const stored = await prisma.zernioApiKey.findUniqueOrThrow({ where: { workspaceId: account.workspaceId } });
+    const encrypted = connection.keySlot === "secondary" ? stored.secondaryApiKey : stored.apiKey;
+    if (!encrypted) throw new Error("Chave Zernio ausente para verificar seguidor");
+    const response = await fetch(`https://zernio.com/api/v1/accounts/${encodeURIComponent(connection.accountId)}/follow-status/${encodeURIComponent(igsid)}?refresh=true`,
+      { headers: { Authorization: `Bearer ${decryptCredential(encrypted)}` }, signal: AbortSignal.timeout(10_000) });
+    if (!response.ok) throw new Error(`Verificação de seguidor Zernio falhou (${response.status})`);
+    const data = await response.json() as { isFollower: boolean | null };
+    return data.isFollower !== false;
+  }
   if (!account.pageAccessToken) return true;
 
   try {
@@ -334,8 +369,7 @@ async function callSend(account: InstagramAccount, igsid: string, message: Recor
 
 async function callGraphApi(account: InstagramAccount, path: string, body: Record<string, unknown>): Promise<void> {
   if (!account.pageAccessToken) {
-    console.log(`[dev sem token] POST graph.facebook.com/${account.graphApiVersion}${path}`, body);
-    return;
+    throw new Error(`Conta ${account.id} sem token Meta: envio não realizado`);
   }
 
   const res = await fetch(
@@ -351,4 +385,28 @@ async function callGraphApi(account: InstagramAccount, path: string, body: Recor
     const errorBody = await res.text();
     throw new Error(`Graph API ${path} falhou (${res.status}): ${errorBody}`);
   }
+}
+
+async function isZernioAccount(account: InstagramAccount): Promise<boolean> {
+  return Boolean(await prisma.zernioConnection.findUnique({ where: { instagramAccountId: account.id }, select: { id: true } }));
+}
+
+async function callZernioSend(account: InstagramAccount, contact: Contact, body: Record<string, unknown>): Promise<void> {
+  if (!contact.zernioConversationId) throw new Error("Conversa Zernio ainda não identificada para este contato");
+  await callZernio(account, `/inbox/conversations/${encodeURIComponent(contact.zernioConversationId)}/messages`, body);
+}
+
+async function callZernio(account: InstagramAccount, path: string, body: Record<string, unknown>, idempotencyKey?: string): Promise<void> {
+  const connection = await prisma.zernioConnection.findUnique({ where: { instagramAccountId: account.id } });
+  if (!connection) throw new Error("Conta Zernio não vinculada");
+  const stored = await prisma.zernioApiKey.findUnique({ where: { workspaceId: account.workspaceId } });
+  const encrypted = connection.keySlot === "secondary" ? stored?.secondaryApiKey : stored?.apiKey;
+  if (!encrypted) throw new Error(`Chave Zernio ${connection.keySlot} não configurada no banco`);
+  const response = await fetch(`https://zernio.com/api/v1${path}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${decryptCredential(encrypted)}`, "Content-Type": "application/json", ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}) },
+    body: JSON.stringify({ accountId: connection.accountId, ...body }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) throw new Error(`Envio Zernio falhou (${response.status}): ${(await response.text()).slice(0, 500)}`);
 }

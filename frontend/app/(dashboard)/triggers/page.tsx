@@ -15,6 +15,7 @@ type Trigger = {
   id: string;
   type: TriggerType;
   postId: string | null;
+  instagramAccountId: string | null;
   keyword: string | null;
   publicReplyText: string | null;
   active: boolean;
@@ -138,7 +139,7 @@ export default function TriggersPage() {
   });
 
   useEffect(() => {
-    if (!accountId && accounts?.length) setAccountId(accounts[0].id);
+    if (!accountId && accounts?.length) setAccountId((accounts.find((account) => account.connected) ?? accounts[0]).id);
   }, [accounts, accountId]);
 
   // RF: busca os posts/reels reais da conta escolhida — atualiza sempre que
@@ -163,6 +164,7 @@ export default function TriggersPage() {
         keyword: keyword.trim() || undefined,
         publicReplyText: type === "comment" ? publicReplyText.trim() || undefined : undefined,
         flowId,
+        instagramAccountId: accountId,
       }),
     onSuccess: () => {
       setShowForm(false);
@@ -180,6 +182,10 @@ export default function TriggersPage() {
     e.preventDefault();
     if (!flowId) {
       setError("Escolha um fluxo.");
+      return;
+    }
+    if (!accountId) {
+      setError("Conecte uma conta Instagram antes de criar a automação.");
       return;
     }
     if (type === "comment" && !postId.trim()) {
@@ -224,6 +230,23 @@ export default function TriggersPage() {
               </button>
             </div>
 
+            {(accounts?.length ?? 0) > 1 && (
+              <label className="flex flex-col gap-1 text-sm">
+                Conta Instagram desta automação
+                <select
+                  className="rounded-[var(--radius)] border border-border bg-background p-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                  value={accountId}
+                  onChange={(e) => { setAccountId(e.target.value); setPostId(""); }}
+                >
+                  {accounts!.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.igUsername ? `@${a.igUsername}` : "Conta sem username salvo"}{!a.connected ? " (desconectada)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+
             {type === "comment" && (
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
@@ -239,27 +262,6 @@ export default function TriggersPage() {
                     Atualizar
                   </Button>
                 </div>
-
-                {(accounts?.length ?? 0) > 1 && (
-                  <label className="flex flex-col gap-1 text-xs">
-                    Conta Instagram
-                    <select
-                      className="rounded-[var(--radius)] border border-border bg-background p-1.5 text-sm outline-none focus:ring-2 focus:ring-primary"
-                      value={accountId}
-                      onChange={(e) => {
-                        setAccountId(e.target.value);
-                        setPostId("");
-                      }}
-                    >
-                      {accounts!.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.igUsername ? `@${a.igUsername}` : "Conta sem username salvo"}
-                          {!a.connected ? " (desconectada)" : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
 
                 {!accounts?.length && (
                   <p className="text-sm text-danger">
@@ -401,6 +403,7 @@ export default function TriggersPage() {
               <TriggerRow
                 key={t.id}
                 trigger={t}
+                accountLabel={t.instagramAccountId ? (accounts?.find((account) => account.id === t.instagramAccountId)?.igUsername || "Conta específica") : "Todas (legado)"}
                 flows={flows ?? []}
                 expanded={expandedId === t.id}
                 onToggleExpand={() => setExpandedId(expandedId === t.id ? null : t.id)}
@@ -440,6 +443,7 @@ export default function TriggersPage() {
 
 function TriggerRow(props: {
   trigger: Trigger;
+  accountLabel: string;
   flows: Flow[];
   expanded: boolean;
   onToggleExpand: () => void;
@@ -484,9 +488,12 @@ function TriggerRow(props: {
           </button>
         </td>
         <td className="p-4">
-          <Badge variant={t.type === "comment" ? "rascunho" : "ativo"}>
-            {t.type === "comment" ? "Comentário" : "DM"}
-          </Badge>
+          <div className="flex flex-col items-start gap-1">
+            <Badge variant={t.type === "comment" ? "rascunho" : "ativo"}>
+              {t.type === "comment" ? "Comentário" : "DM"}
+            </Badge>
+            <span className="text-xs text-muted-foreground">{props.accountLabel}</span>
+          </div>
         </td>
         <td className="p-4">
           {t.type === "comment" ? (

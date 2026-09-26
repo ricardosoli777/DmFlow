@@ -11,7 +11,7 @@ type ResumeOptions = {
   capturedText?: string;
 };
 
-type RunContext = { originCommentId?: string; pendingPrivateReply?: boolean; [key: string]: unknown };
+type RunContext = { originCommentId?: string; originPostId?: string; pendingPrivateReply?: boolean; [key: string]: unknown };
 
 // RF04 — máquina de estados: executa o node atual do flow_run e avança.
 // Quando o flow_run estava "waiting" (ex: node capture), `options.capturedText`
@@ -43,6 +43,7 @@ export async function advanceFlowRun(flowRunId: string, options: ResumeOptions =
   // aberta. Só vale pro primeiro node processado nesta run, uma única vez.
   const context = (run.context ?? {}) as RunContext;
   const privateReplyPending = Boolean(context.pendingPrivateReply && context.originCommentId);
+  const zernioComment = privateReplyPending && Boolean(await prisma.zernioConnection.findUnique({ where: { instagramAccountId: account.id } }));
 
   while (currentNodeId) {
     const node = definition.nodes.find((n) => n.id === currentNodeId);
@@ -55,7 +56,7 @@ export async function advanceFlowRun(flowRunId: string, options: ResumeOptions =
       contact: run.contact,
       account,
       resumeInput: isFirstIteration ? resumeInput : undefined,
-      privateReply: isFirstIteration && privateReplyPending ? { commentId: context.originCommentId as string } : undefined,
+      privateReply: isFirstIteration && privateReplyPending ? { commentId: context.originCommentId as string, postId: context.originPostId as string } : undefined,
     });
 
     if (isFirstIteration && privateReplyPending) {
@@ -63,6 +64,14 @@ export async function advanceFlowRun(flowRunId: string, options: ResumeOptions =
         where: { id: run.id },
         data: { context: { ...context, pendingPrivateReply: false } as Prisma.InputJsonValue },
       });
+      // A resposta privada abre a solicitação de mensagem, mas não concede
+      // imediatamente uma conversa para envios adicionais. Só continuar quando
+      // a pessoa responder por DM (message.received).
+      if (zernioComment && node.type === "message" &&
+          (!Array.isArray(node.options) || node.options.length === 0) && result.nextNodeId) {
+        await prisma.flowRun.update({ where: { id: run.id }, data: { currentNode: result.nextNodeId, status: "waiting" } });
+        return;
+      }
     }
 
     isFirstIteration = false;
