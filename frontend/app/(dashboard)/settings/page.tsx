@@ -157,6 +157,7 @@ export default function SettingsPage() {
 function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [credentialsOpen, setCredentialsOpen] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showTechnicalError, setShowTechnicalError] = useState(false);
   const [zernioAccounts, setZernioAccounts] = useState<Array<{ accountId: string; username: string; profileId?: string }>>([]);
@@ -192,6 +193,7 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
     onSuccess: () => {
       setSaveError(null);
       setForm(emptyForm);
+      setCredentialsOpen(false);
       queryClient.invalidateQueries({ queryKey: ["instagram-accounts"] });
     },
     onError: (err: unknown) => {
@@ -294,12 +296,33 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
         )}
 
         {account.connectionMethod !== "zernio" && (
-          <details className="group rounded-[var(--radius)] border border-border bg-muted/20">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 text-sm font-medium [&::-webkit-details-marker]:hidden">
-              <span>Credenciais da Meta</span>
-              <span className="text-xs text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
-            </summary>
-            <div className="border-t border-border p-4">
+          <section className="rounded-[var(--radius)] border border-border bg-muted/20">
+            <div className="flex items-center justify-between gap-4 p-4">
+              <div>
+                <p className="text-sm font-medium">Credenciais da Meta</p>
+                <p className="text-xs text-muted-foreground">
+                  {credentialsOpen ? "Credenciais visíveis para edição" : "Credenciais ocultas"}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={credentialsOpen}
+                aria-label={credentialsOpen ? "Ocultar credenciais da Meta" : "Mostrar credenciais da Meta"}
+                onClick={() => setCredentialsOpen((open) => !open)}
+                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                  credentialsOpen ? "bg-primary" : "bg-muted-foreground/40"
+                }`}
+              >
+                <span
+                  className={`absolute left-0 top-0.5 h-5 w-5 rounded-full bg-background shadow transition-transform ${
+                    credentialsOpen ? "translate-x-5" : "translate-x-0.5"
+                  }`}
+                />
+              </button>
+            </div>
+            {credentialsOpen && (
+              <div className="border-t border-border p-4">
           <p className="mb-4 text-sm text-muted-foreground">
           Preencha os campos abaixo, na ordem, pra conectar (ou trocar) essa conta — cada um tem um botão que já
           abre a tela certa da Meta. Deixe em branco o que você não quer alterar. Guia completo em{" "}
@@ -358,6 +381,7 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
             value={field("verifyToken")}
             placeholder={account.hasVerifyToken ? "•••••••••• (já configurado)" : ""}
             onChange={(v) => setForm({ ...form, verifyToken: v })}
+            type="password"
           />
 
           {saveError && (
@@ -382,8 +406,9 @@ function InstagramAccountCard({ account }: { account: InstagramAccountStatus }) 
             </Button>
           </div>
         </form>
-            </div>
-          </details>
+              </div>
+            )}
+          </section>
         )}
       </CardContent>
     </Card>
