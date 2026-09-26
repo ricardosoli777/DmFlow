@@ -20,6 +20,11 @@ enum WorkspaceInvitationStatus {
   EXPIRED
 }
 
+enum MagicLinkPurpose {
+  LOGIN
+  REGISTER
+}
+
 // RF16 — usuário sem senha: login é sempre por magic-link (RNF10). Pode
 // pertencer a vários workspaces (WorkspaceMember).
 model User {
@@ -87,6 +92,7 @@ model MagicLinkToken {
   id        String    @id @default(uuid())
   email     String
   token     String    @unique
+  purpose   MagicLinkPurpose @default(LOGIN)
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime  @default(now())

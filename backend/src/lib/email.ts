@@ -48,6 +48,7 @@ export async function sendTransactionalEmail(to: string, subject: string, html: 
   console.log(`[dev sem RESEND_API_KEY/GMAIL_APP_PASSWORD] e-mail pra ${to} — ${subject}\n${html}`);
 }
 
-export function magicLinkEmailHtml(verifyUrl: string): string {
-  return `<p>Clique no link abaixo pra entrar no DMFlow:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p><p>Expira em 15 minutos. Se você não pediu esse link, pode ignorar este e-mail.</p>`;
+export function magicLinkEmailHtml(verifyUrl: string, purpose: "login" | "cadastro" = "login"): string {
+  const action = purpose === "cadastro" ? "confirmar seu cadastro no" : "entrar no";
+  return `<p>Clique no link abaixo pra ${action} DMFlow:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p><p>Expira em 15 minutos. Se você não pediu esse link, pode ignorar este e-mail.</p>`;
 }
