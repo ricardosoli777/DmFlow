@@ -14,7 +14,7 @@ type Overview = {
   messagesSent: number;
 };
 
-type AccountStatus = { id: string; igUsername: string; connected: boolean; username?: string; error?: string };
+type AccountStatus = { id: string; igUsername: string; connected: boolean; connectionMethod: "meta" | "zernio"; username?: string; error?: string };
 
 type Health = {
   lastEventAt: string | null;
@@ -75,9 +75,9 @@ export default function OverviewPage() {
           {(health?.accounts ?? []).map((a) => (
             <HealthCard
               key={a.id}
-              title={a.igUsername ? `Conexão — @${a.igUsername}` : "Conexão com o Instagram"}
+              title={a.igUsername || a.username ? `Conexão — @${a.igUsername || a.username}` : "Conexão com o Instagram"}
               ok={a.connected}
-              okText={a.username ? `Conectado como @${a.username}` : "Conectado"}
+              okText={a.connectionMethod === "zernio" ? "Conta encontrada na API do Zernio" : a.username ? `Conectado como @${a.username} via Meta` : "Conectado via Meta"}
               badText={a.error ?? "Sem resposta da Graph API"}
             />
           ))}

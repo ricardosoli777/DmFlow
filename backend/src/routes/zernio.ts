@@ -33,6 +33,20 @@ async function zernio<T>(apiKey: string, path: string, init?: RequestInit): Prom
   return response.json() as Promise<T>;
 }
 
+export async function checkZernioConnection(workspaceId: string, accountId: string): Promise<{ connected: boolean; username?: string; error?: string }> {
+  try {
+    const apiKey = await workspaceApiKey(workspaceId);
+    if (!apiKey) return { connected: false, error: "Chave de API do Zernio não configurada" };
+    const available = await zernio<{ accounts?: ZernioAccount[] }>(apiKey, "/accounts", { signal: AbortSignal.timeout(10_000) });
+    const account = available.accounts?.find((item) => item._id === accountId && item.platform === "instagram");
+    return account
+      ? { connected: true, username: account.username }
+      : { connected: false, error: "Conta Instagram não encontrada no Zernio" };
+  } catch {
+    return { connected: false, error: "Não foi possível validar a conexão com o Zernio" };
+  }
+}
+
 export async function zernioRoutes(app: FastifyInstance) {
   app.get("/zernio-api-key", { preHandler: requireAuth }, async (req) => {
     const stored = await prisma.zernioApiKey.findUnique({ where: { workspaceId: req.workspaceId }, select: { workspaceId: true } });

@@ -3,6 +3,7 @@ import { listInstagramAccounts } from "@dmflow/db";
 import { instagramEventsQueue } from "../lib/queue";
 import { prisma } from "../lib/prisma";
 import { checkInstagramConnection } from "./instagram-accounts";
+import { checkZernioConnection } from "./zernio";
 
 // RF12 — métricas de funil pro dashboard, tudo escopado ao workspace atual (RF16)
 export async function metricsRoutes(app: FastifyInstance) {
@@ -63,7 +64,7 @@ export async function metricsRoutes(app: FastifyInstance) {
   app.get("/metrics/health", async (req) => {
     const recentSince = new Date(Date.now() - 10 * 60_000); // últimos 10min
 
-    const [lastEvent, pendingEvents, jobCounts, accounts] = await Promise.all([
+    const [lastEvent, pendingEvents, jobCounts, accounts, zernioConnection] = await Promise.all([
       prisma.rawEvent.findFirst({ where: { workspaceId: req.workspaceId }, orderBy: { createdAt: "desc" } }),
       // só conta evento parado se for RECENTE — um evento antigo que falhou
       // de vez (ex: janela de 24h fechada) fica marcado como processado pelo
@@ -74,14 +75,21 @@ export async function metricsRoutes(app: FastifyInstance) {
       }),
       instagramEventsQueue.getJobCounts("waiting", "active", "failed", "completed"),
       listInstagramAccounts(req.workspaceId),
+      prisma.zernioConnection.findUnique({ where: { workspaceId: req.workspaceId } }),
     ]);
 
     const accountsStatus = await Promise.all(
-      accounts.map(async (a) => ({
-        id: a.id,
-        igUsername: a.igUsername,
-        ...(await checkInstagramConnection(a.pageAccessToken, a.igUserId, a.graphApiVersion)),
-      })),
+      accounts.map(async (a) => {
+        const viaZernio = zernioConnection?.instagramAccountId === a.id;
+        return {
+          id: a.id,
+          igUsername: a.igUsername,
+          connectionMethod: viaZernio ? "zernio" : "meta",
+          ...(viaZernio
+            ? await checkZernioConnection(req.workspaceId, zernioConnection.accountId)
+            : await checkInstagramConnection(a.pageAccessToken, a.igUserId, a.graphApiVersion)),
+        };
+      }),
     );
 
     return {

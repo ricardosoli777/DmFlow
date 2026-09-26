@@ -29,7 +29,7 @@ vi.mock("../../lib/auth", async (importOriginal) => {
   };
 });
 
-import { zernioRoutes } from "../zernio";
+import { checkZernioConnection, zernioRoutes } from "../zernio";
 
 const encryptionKey = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
 const previousKey = process.env.META_CREDENTIALS_ENCRYPTION_KEY;
@@ -112,5 +112,18 @@ describe("Zernio API key", () => {
     } finally {
       await server.close();
     }
+  });
+
+  it("validates that the linked Instagram account is still available in Zernio", async () => {
+    mocks.findKey.mockResolvedValue({ apiKey: encryptCredential("stored-key") });
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => new Response(JSON.stringify({
+      accounts: [{ _id: "zernio-account", platform: "instagram", username: "example" }],
+    }), { status: 200 })));
+
+    await expect(checkZernioConnection("workspace-1", "zernio-account")).resolves.toEqual({ connected: true, username: "example" });
+    await expect(checkZernioConnection("workspace-1", "other-account")).resolves.toEqual({
+      connected: false,
+      error: "Conta Instagram não encontrada no Zernio",
+    });
   });
 });
