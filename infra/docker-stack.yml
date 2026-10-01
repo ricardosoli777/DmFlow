@@ -27,7 +27,9 @@ services:
     volumes:
       - dmflow_postgres_data:/var/lib/postgresql/data
     networks:
-      - dmflow_internal
+      dmflow_internal:
+        aliases:
+          - dmflow-postgres
     deploy:
       restart_policy:
         condition: on-failure
@@ -37,7 +39,9 @@ services:
     volumes:
       - dmflow_redis_data:/data
     networks:
-      - dmflow_internal
+      dmflow_internal:
+        aliases:
+          - dmflow-redis
     deploy:
       restart_policy:
         condition: on-failure
@@ -51,7 +55,9 @@ services:
     volumes:
       - dmflow_minio_data:/data
     networks:
-      - dmflow_internal
+      dmflow_internal:
+        aliases:
+          - dmflow-minio
     deploy:
       restart_policy:
         condition: on-failure
@@ -103,6 +109,7 @@ services:
         - "traefik.docker.network=${TRAEFIK_NETWORK}"
         - "traefik.http.routers.dmflow-hooks.rule=Host(`${DMFLOW_API_HOST}`)"
         - "traefik.http.routers.dmflow-hooks.entrypoints=${TRAEFIK_ENTRYPOINT}"
+        - "traefik.http.routers.dmflow-hooks.tls=true"
         - "traefik.http.routers.dmflow-hooks.tls.certresolver=${TRAEFIK_CERTRESOLVER}"
         - "traefik.http.routers.dmflow-hooks.service=dmflow-hooks"
         - "traefik.http.services.dmflow-hooks.loadbalancer.server.port=4000"
@@ -132,6 +139,7 @@ services:
         - "traefik.docker.network=${TRAEFIK_NETWORK}"
         - "traefik.http.routers.dmflow.rule=Host(`${DMFLOW_APP_HOST}`)"
         - "traefik.http.routers.dmflow.entrypoints=${TRAEFIK_ENTRYPOINT}"
+        - "traefik.http.routers.dmflow.tls=true"
         - "traefik.http.routers.dmflow.tls.certresolver=${TRAEFIK_CERTRESOLVER}"
         - "traefik.http.routers.dmflow.service=dmflow"
         - "traefik.http.services.dmflow.loadbalancer.server.port=3000"

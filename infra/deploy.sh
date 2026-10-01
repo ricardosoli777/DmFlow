@@ -16,8 +16,8 @@ source .env
 set +a
 
 for name in DATABASE_URL JWT_SECRET META_CREDENTIALS_ENCRYPTION_KEY POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB MINIO_ROOT_USER MINIO_ROOT_PASSWORD DMFLOW_IMAGE_REPOSITORY PUBLIC_APP_URL PUBLIC_API_URL TRAEFIK_NETWORK TRAEFIK_ENTRYPOINT TRAEFIK_CERTRESOLVER; do
-  if [[ -z "${!name:-}" ]]; then
-    echo "Variável obrigatória ausente: $name" >&2
+  if [[ -z "${!name:-}" || "${!name}" == *troque_* ]]; then
+    echo "Preencha $name com um valor real no .env antes do deploy." >&2
     exit 1
   fi
 done

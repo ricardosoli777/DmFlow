@@ -2,8 +2,8 @@
 
 Este guia descreve dois caminhos. **Docker Compose local** é o caminho para
 começar: compila as imagens no computador de quem instala e usa
-`http://localhost:3000`. **Docker Swarm + Traefik** é um exemplo avançado
-para quem já administra uma VPS, um domínio e um proxy HTTPS. Nenhuma
+`http://localhost:3000`. **Docker Swarm + Traefik** instala o projeto em
+uma VPS Linux de um nó, com domínio e HTTPS. Nenhuma
 credencial, domínio ou IP da instalação original é necessária.
 
 ## 1. Instalação local com Docker Compose
@@ -32,7 +32,8 @@ credencial, domínio ou IP da instalação original é necessária.
    `DATABASE_URL=postgresql://dmflow:SUA_SENHA@postgres:5432/dmflow`.
    Use letras e números para não precisar codificar caracteres reservados na
    URL.
-4. Gere `JWT_SECRET` e `META_CREDENTIALS_ENCRYPTION_KEY`. Ambos precisam
+4. Troque `MINIO_ROOT_PASSWORD` por outra senha longa. Gere `JWT_SECRET`
+   e `META_CREDENTIALS_ENCRYPTION_KEY`. Os dois segredos precisam
    ser diferentes. No macOS/Linux, rode `openssl rand -base64 32` duas vezes
    e cole cada resultado em uma variável. No PowerShell, rode o bloco abaixo
    duas vezes:
@@ -110,53 +111,186 @@ senha original ou faça uma migração de senha no banco.
 
 ## 2. VPS própria com Docker Swarm e Traefik
 
-Este caminho pressupõe Docker Swarm ativo, Traefik funcionando com uma rede
-overlay externa, dois nomes DNS seus apontando para a VPS e certificados
-HTTPS. Não use o `docker-compose.yml` local como stack Swarm: ele compila
-imagens localmente, enquanto `infra/docker-stack.yml` consome imagens
-publicadas no registro do seu repositório.
+Este roteiro serve para **uma VPS Linux de um nó**, com domínio próprio e
+acesso SSH. Os comandos abaixo rodam na VPS, exceto a configuração do GitHub
+e do DNS. Use, por exemplo, `app.seudominio.com` para o painel e
+`api.seudominio.com` para a API. Substitua esses nomes e `SEU_USUARIO`
+pelos seus valores. Para um Swarm de vários nós, planeje separadamente
+volumes persistentes e portas entre nós.
 
-1. Publique o projeto em um repositório seu. O workflow
-   [release.yml](../.github/workflows/release.yml) produz as imagens
-   `dmflow-backend`, `dmflow-worker` e `dmflow-frontend` no namespace
-   GHCR desse repositório, com tag `sha-<commit-curto>`.
-2. Nas configurações do repositório, crie o secret
-   `DMFLOW_PUBLIC_API_URL` com a URL HTTPS pública da sua API, sem barra
-   final. O frontend precisa desse valor **durante o build**. Quem fizer um
-   fork precisa configurar o próprio secret antes de publicar imagens.
-3. Na VPS, clone seu repositório e crie `.env` a partir de
-   `.env.example`. Gere os segredos como no passo local. Use URLs HTTPS
-   próprias em `PUBLIC_APP_URL` e `PUBLIC_API_URL`, sem barra final.
-   Ajuste `DATABASE_URL` para o hostname `dmflow-postgres` (não
-   `postgres`), mantendo a mesma senha de `POSTGRES_PASSWORD`.
-4. Preencha `DMFLOW_IMAGE_REPOSITORY` com o namespace do seu registro
-   (formato `ghcr.io/SEU_USUARIO`). Preencha `TRAEFIK_NETWORK` com o nome
-   da rede overlay externa conectada ao Traefik,
-   `TRAEFIK_ENTRYPOINT` e `TRAEFIK_CERTRESOLVER` com os nomes usados
-   pela sua configuração do Traefik. Confira que a rede existe com
-   `docker network ls`. Se as imagens GHCR forem privadas, autentique o
-   Docker no registro antes do deploy.
-5. Configure um provedor de e-mail real. Sem ele, os links de cadastro e
-   login só aparecerão nos logs do backend da VPS, o que não serve para
-   usuários externos. Confira que o remetente em `EMAIL_FROM` pertence
-   ao provedor configurado.
-6. Depois de o workflow publicar as imagens, execute na pasta do projeto:
+### Passo 1 — Prepare VPS, Docker e DNS
+
+1. Crie dois registros **A** no provedor de DNS, ambos apontando para o IP
+   público IPv4 da VPS. Se usar IPv6, crie registros AAAA apenas quando ele
+   também alcançar a VPS. Aguarde os nomes resolverem para o IP correto.
+2. Libere entrada TCP nas portas **80** e **443** no firewall da VPS e do
+   provedor. Mantenha acesso SSH. A porta 80 é necessária para o desafio
+   HTTP da Let's Encrypt. Não exponha Postgres, Redis, MinIO ou a porta
+   4000 diretamente à internet.
+3. Instale Git e OpenSSL pelo gerenciador de pacotes do seu Linux. Em uma
+   VPS **Ubuntu LTS nova**, instale o Docker Engine pelo repositório oficial:
 
    ```bash
-   bash infra/deploy.sh sha-SEU_COMMIT_CURTO
-   docker service ls
-   docker service logs --tail 30 dmflow_migrate
+   sudo apt update
+   sudo apt install -y git openssl ca-certificates curl
+   sudo install -m 0755 -d /etc/apt/keyrings
+   sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+   sudo chmod a+r /etc/apt/keyrings/docker.asc
+   sudo tee /etc/apt/sources.list.d/docker.sources > /dev/null <<EOF
+   Types: deb
+   URIs: https://download.docker.com/linux/ubuntu
+   Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+   Components: stable
+   Architectures: $(dpkg --print-architecture)
+   Signed-By: /etc/apt/keyrings/docker.asc
+   EOF
+   sudo apt update
+   sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
    ```
 
-O script carrega o `.env`, valida variáveis obrigatórias e aplica a stack.
-O serviço `dmflow_migrate` roda uma vez e pode aparecer como `0/1`
-após concluir; confirme nos logs que as migrations terminaram sem erro.
-Verifique a rota `/health` da API e as páginas `/register` e `/login`
-do painel nos **seus** domínios. Cadastre o webhook da Meta com
-`<PUBLIC_API_URL>/webhooks/instagram`.
+   Em Debian ou outra distribuição, siga o
+   [guia oficial correspondente](https://docs.docker.com/engine/install/).
+   Em uma VPS que já usa Docker, confira a instalação existente antes de
+   adicionar o repositório. Confirme:
 
-Antes de atualizar uma instalação com dados, faça backup do banco e dos
-volumes conforme a política da sua VPS. O script não cria backup.
+   ```bash
+   git --version
+   openssl version
+   docker version
+   docker info
+   ```
+
+   Se o seu usuário não tiver acesso ao daemon, use uma sessão com acesso
+   administrativo para os comandos Docker. Para uma VPS nova de um único
+   endereço, inicie o Swarm e crie a rede do proxy:
+
+   ```bash
+   docker swarm init
+   docker network create --driver overlay --attachable dmflow_proxy
+   docker network ls
+   ```
+
+   Se o Swarm já estiver ativo, pule `swarm init`; se já usar Traefik,
+   use a rede overlay dele no passo 3. Em VPS com várias interfaces, passe
+   `--advertise-addr IP_DA_INTERFACE` ao inicializar o Swarm.
+
+### Passo 2 — Publique as imagens do seu repositório
+
+1. Faça fork ou publique o código em um repositório GitHub sob sua conta.
+   Se o GitHub pedir para habilitar Actions no fork, habilite-as.
+   Em **Settings → Secrets and variables → Actions**, crie o secret
+   `DMFLOW_PUBLIC_API_URL` com `https://api.seudominio.com`, sem barra
+   final. Ele entra no JavaScript do frontend **durante o build**.
+2. Envie um commit à branch `main` ou crie uma tag `vX.Y.Z`. Em
+   **Actions → Release**, aguarde os três builds terminarem com sucesso.
+   O [workflow](../.github/workflows/release.yml) publica
+   `dmflow-backend`, `dmflow-worker` e `dmflow-frontend` no GHCR com
+   a mesma tag `sha-<7 caracteres do commit>`.
+3. Em **Packages** no GitHub, deixe os três pacotes públicos para o
+   primeiro deploy. Se quiser mantê-los privados, autentique o Docker
+   da VPS no `ghcr.io` com um token que tenha `read:packages` antes
+   do deploy. O script usa `--with-registry-auth` para repassar essa
+   autenticação ao Swarm.
+
+### Passo 3 — Clone e configure o `.env` na VPS
+
+```bash
+git clone https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git dmflow
+cd dmflow
+cp .env.example .env
+chmod 600 .env
+```
+
+Edite `.env` e confira esta lista. Use **letras e números** nas senhas
+colocadas em `DATABASE_URL` para evitar codificação especial de URL.
+Não coloque espaços antes ou depois de `=`.
+
+| Variável | Valor na VPS |
+|---|---|
+| `POSTGRES_PASSWORD` | Senha longa e exclusiva, diferente do exemplo. |
+| `DATABASE_URL` | `postgresql://dmflow:SUA_SENHA@dmflow-postgres:5432/dmflow`, com a mesma senha acima. |
+| `MINIO_ROOT_PASSWORD` | Outra senha longa, diferente do exemplo. |
+| `JWT_SECRET` | Resultado de `openssl rand -base64 32`. |
+| `META_CREDENTIALS_ENCRYPTION_KEY` | Outro resultado de `openssl rand -base64 32`. Preserve esta chave para conseguir ler as credenciais já cifradas. |
+| `PUBLIC_APP_URL` | `https://app.seudominio.com`, sem barra final. |
+| `PUBLIC_API_URL` | `https://api.seudominio.com`, sem barra final. Deve ser igual ao secret do build. |
+| `DMFLOW_IMAGE_REPOSITORY` | `ghcr.io/seu_usuario` em minúsculas, sem barra final. |
+| `TRAEFIK_NETWORK` | `dmflow_proxy` para o exemplo abaixo. |
+| `TRAEFIK_ENTRYPOINT` | `websecure` para o exemplo abaixo. |
+| `TRAEFIK_CERTRESOLVER` | `letsencrypt` para o exemplo abaixo. |
+| `TRAEFIK_ACME_EMAIL` | Seu e-mail para os avisos da Let's Encrypt; usado só pelo proxy de exemplo. |
+
+Deixe `POSTGRES_USER=dmflow` e `POSTGRES_DB=dmflow`. Para criar a
+primeira conta pelo painel, deixe `DASHBOARD_ADMIN_EMAIL` vazio. Se
+preencher com seu e-mail **antes do primeiro deploy**, o seed criará a
+conta e o workspace; nesse caso comece em `/login`. Configure **Resend**
+ou **Gmail** e um `EMAIL_FROM` autorizado, conforme
+[envio dos links](../README.md#envio-dos-links-por-e-mail). Sem isso, os
+links de acesso só aparecem nos logs da VPS. `NEXT_PUBLIC_API_URL` do
+`.env` não recompila uma imagem do GHCR: para mudar a API pública,
+atualize o secret do GitHub, publique novas imagens e redeploye.
+
+### Passo 4 — Suba o proxy HTTPS
+
+Se já existe Traefik com provider **Swarm**, rede overlay, entrada HTTPS
+e emissor de certificados, use os nomes reais dessa instalação nas
+variáveis `TRAEFIK_*` e pule o comando abaixo. Para a VPS nova, o
+[proxy de exemplo](../infra/traefik-stack.yml) usa os nomes da tabela.
+Ele segue o [provider Swarm](https://doc.traefik.io/traefik/v3.5/reference/install-configuration/providers/swarm/)
+e o [desafio HTTP ACME](https://doc.traefik.io/traefik/v3.5/reference/install-configuration/tls/certificate-resolvers/acme/)
+do Traefik.
+Carregue o `.env` no shell e suba-o:
+
+```bash
+set -a
+source .env
+set +a
+test -n "$TRAEFIK_ACME_EMAIL"
+docker stack deploy -c infra/traefik-stack.yml traefik
+docker service ls
+docker service logs --tail 50 traefik_traefik
+```
+
+Confirme que `traefik_traefik` está `1/1`. O proxy guarda os certificados
+no volume `traefik_traefik_acme`; preserve esse volume nos backups. O
+proxy tem acesso de leitura ao socket Docker para descobrir os serviços,
+portanto administre esta VPS e seus serviços Docker como infraestrutura
+confiável.
+
+### Passo 5 — Aplique a stack do DMFlow
+
+Confira no GitHub o commit publicado e substitua a tag abaixo. Se a VPS
+estiver exatamente nesse commit, `git rev-parse --short=7 HEAD` mostra os
+sete caracteres. Depois:
+
+```bash
+bash infra/deploy.sh sha-SEU_COMMIT_CURTO
+docker service ls
+docker service logs --tail 50 dmflow_migrate
+docker service logs --tail 50 dmflow_backend
+```
+
+O script carrega `.env` e aplica `infra/docker-stack.yml`. A migração
+roda uma vez; `dmflow_migrate` pode aparecer `0/1` depois de concluir.
+Os logs devem mostrar migrações e seed sem erro. Backend, worker e frontend
+devem ficar `1/1`; se algum estiver `0/1`, veja
+`docker service ps dmflow_NOME --no-trunc` e
+`docker service logs dmflow_NOME`.
+
+Confira `https://api.seudominio.com/health` no navegador ou com
+`curl -i https://api.seudominio.com/health`. Depois abra
+`https://app.seudominio.com/register` e `/login`. Cadastre o webhook
+da Meta em `https://api.seudominio.com/webhooks/instagram` conforme o
+[guia de integração](04-integracao-meta.md). O painel pode ser validado
+antes de conectar a Meta.
+
+### Atualizações e dados
+
+Ao atualizar, faça backup do banco e dos volumes antes de trocar a tag.
+Publique o novo commit na `main`, confirme os três builds no GitHub,
+atualize o clone da VPS para esse commit e rode
+`bash infra/deploy.sh sha-NOVO_COMMIT_CURTO`. O script não cria backup.
+Não execute `docker stack rm dmflow` para fazer uma atualização normal.
 
 ## Notas de arquitetura
 

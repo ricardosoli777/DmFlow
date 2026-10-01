@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
+  <title id="title">DMFlow</title>
+  <desc id="desc">Banner tecnológico com gradiente violeta e ciano, circuitos e nós de automação conectados.</desc>
+  <defs>
+    <linearGradient id="background" x2="1" y2="1"><stop stop-color="#0B1026"/><stop offset=".52" stop-color="#151448"/><stop offset="1" stop-color="#071D36"/></linearGradient>
+    <linearGradient id="neon" x2="1" y2="0"><stop stop-color="#A78BFA"/><stop offset=".5" stop-color="#E879F9"/><stop offset="1" stop-color="#22D3EE"/></linearGradient>
+    <linearGradient id="tile" x2="1" y2="1"><stop stop-color="#7C3AED"/><stop offset="1" stop-color="#0891B2"/></linearGradient>
+    <pattern id="grid" width="36" height="36" patternUnits="userSpaceOnUse"><path d="M36 0H0V36" fill="none" stroke="#8B9BCB" stroke-opacity=".12"/></pattern>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="12"/></filter>
+  </defs>
+  <rect width="1200" height="360" rx="28" fill="url(#background)"/><rect width="1200" height="360" rx="28" fill="url(#grid)"/>
+  <circle cx="1022" cy="156" r="125" fill="#7C3AED" opacity=".2" filter="url(#glow)"/><circle cx="870" cy="280" r="95" fill="#06B6D4" opacity=".18" filter="url(#glow)"/>
+  <path d="M0 298h70l34-34h68M950 0v54l48 48h202M1058 360v-35l41-41h101" fill="none" stroke="url(#neon)" stroke-opacity=".35" stroke-width="2"/>
+  <circle cx="172" cy="264" r="5" fill="#22D3EE"/><circle cx="998" cy="102" r="5" fill="#E879F9"/>
+  <rect x="72" y="72" width="104" height="104" rx="26" fill="url(#tile)"/><path d="m102 125 48-28-19 51-10-20-19-3Z" fill="#fff"/><path d="m121 128 29-31" stroke="#C4B5FD" stroke-width="3" stroke-linecap="round"/>
+  <text x="203" y="150" fill="#F8FAFC" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="72" font-weight="800" letter-spacing="-3">DM<tspan fill="url(#neon)">Flow</tspan></text>
+  <text x="74" y="224" fill="#CFD7F3" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="25" font-weight="500">Automação inteligente para conversas no Instagram</text>
+  <rect x="74" y="258" width="314" height="40" rx="20" fill="#FFFFFF" fill-opacity=".09" stroke="#B6C9F9" stroke-opacity=".22"/><text x="96" y="284" fill="#A5F3FC" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700" letter-spacing="2">GATILHOS  •  FLUXOS  •  DMs</text>
+  <path d="M744 180h65c36 0 34-81 79-81h75M809 180h101c36 0 34 87 79 87h76" fill="none" stroke="url(#neon)" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="741" cy="180" r="24" fill="#251C60" stroke="#A78BFA" stroke-width="3"/><circle cx="741" cy="180" r="7" fill="#E9D5FF"/>
+  <circle cx="964" cy="99" r="23" fill="#252159" stroke="#E879F9" stroke-width="3"/><path d="m955 99 7 7 13-15" fill="none" stroke="#FCE7F3" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="1066" cy="267" r="23" fill="#0A3B56" stroke="#22D3EE" stroke-width="3"/><path d="M1056 267h20m-9-9 9 9-9 9" fill="none" stroke="#CFFAFE" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x=".5" y=".5" width="1199" height="359" rx="27.5" fill="none" stroke="url(#neon)" stroke-opacity=".32"/>
+</svg>

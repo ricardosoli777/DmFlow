@@ -20,7 +20,8 @@ if ($LASTEXITCODE -ne 0) {
 if (-not (Test-Path -LiteralPath '.env')) {
     Copy-Item -LiteralPath '.env.example' -Destination '.env'
     Write-Host 'Arquivo .env criado. Edite POSTGRES_PASSWORD e a senha dentro de DATABASE_URL'
-    Write-Host 'com o mesmo valor. Preencha JWT_SECRET e META_CREDENTIALS_ENCRYPTION_KEY.'
+    Write-Host 'com o mesmo valor. Troque MINIO_ROOT_PASSWORD e preencha JWT_SECRET'
+    Write-Host 'e META_CREDENTIALS_ENCRYPTION_KEY.'
     Write-Host 'Veja os comandos de geração no README. Depois rode este script novamente.'
     exit 0
 }
@@ -31,7 +32,7 @@ foreach ($line in Get-Content -LiteralPath '.env') {
         $settings[$Matches[1]] = $Matches[2]
     }
 }
-foreach ($name in @('POSTGRES_PASSWORD', 'DATABASE_URL', 'JWT_SECRET', 'META_CREDENTIALS_ENCRYPTION_KEY')) {
+foreach ($name in @('POSTGRES_PASSWORD', 'DATABASE_URL', 'MINIO_ROOT_PASSWORD', 'JWT_SECRET', 'META_CREDENTIALS_ENCRYPTION_KEY')) {
     $value = [string]$settings[$name]
     if ([string]::IsNullOrWhiteSpace($value) -or $value.Contains('troque_')) {
         Write-Error "Preencha $name no .env antes de continuar (veja o README)."

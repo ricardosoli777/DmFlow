@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="frontend/public/logo-wordmark.svg" alt="DMFlow" width="280" />
+  <img src="docs/assets/readme-banner.svg" alt="DMFlow: automação inteligente para conversas no Instagram" width="100%" />
 </p>
 
 # DMFlow
@@ -49,6 +49,7 @@ Abra o novo arquivo `.env` e preencha:
 |---|---|
 | `POSTGRES_PASSWORD` | Troque o valor de exemplo por uma senha longa de letras e números. |
 | `DATABASE_URL` | Troque a senha dentro da URL pela **mesma** senha de `POSTGRES_PASSWORD`; mantenha `@postgres:5432/dmflow` no Compose local. |
+| `MINIO_ROOT_PASSWORD` | Troque o valor de exemplo por outra senha longa; ela protege o armazenamento de mídia. |
 | `JWT_SECRET` | Gere uma string aleatória longa. |
 | `META_CREDENTIALS_ENCRYPTION_KEY` | Gere outra chave aleatória Base64 de 32 bytes; não reutilize o JWT secret. |
 
@@ -162,11 +163,10 @@ Para manter seus dados, **não** use `docker compose down -v`: a opção
 
 ## Instalação em VPS
 
-O [guia de instalação reproduzível](docs/08-reprodutibilidade-docker-github.md)
-explica a diferença entre Compose local e o exemplo de produção com Docker
-Swarm, Traefik, GHCR, DNS e HTTPS. Para a VPS, configure seus próprios
-domínios em `.env` e publique um frontend compilado com a URL pública da
-sua API. Nenhum endereço de outra instalação é necessário.
+O [guia de instalação reproduzível](docs/08-reprodutibilidade-docker-github.md#2-vps-própria-com-docker-swarm-e-traefik)
+traz o roteiro completo para uma VPS Linux: Docker, DNS, Swarm, Traefik,
+imagens no GHCR, `.env`, deploy e verificação. Separe um domínio para o
+painel e outro para a API; nenhum endereço de outra instalação é necessário.
 
 ## Estrutura e documentação
 

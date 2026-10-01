@@ -19,13 +19,14 @@ fi
 if [[ ! -f .env ]]; then
   cp .env.example .env
   echo "Arquivo .env criado. Edite POSTGRES_PASSWORD e a senha dentro de DATABASE_URL"
-  echo "com o mesmo valor. Preencha JWT_SECRET e META_CREDENTIALS_ENCRYPTION_KEY."
+  echo "com o mesmo valor. Troque MINIO_ROOT_PASSWORD e preencha JWT_SECRET"
+  echo "e META_CREDENTIALS_ENCRYPTION_KEY."
   echo "Veja os comandos de geração no README. Depois rode este script novamente."
   exit 0
 fi
 
 env_value() { sed -n "s/^$1=//p" .env | tail -n 1; }
-for name in POSTGRES_PASSWORD DATABASE_URL JWT_SECRET META_CREDENTIALS_ENCRYPTION_KEY; do
+for name in POSTGRES_PASSWORD DATABASE_URL MINIO_ROOT_PASSWORD JWT_SECRET META_CREDENTIALS_ENCRYPTION_KEY; do
   value="$(env_value "$name")"
   if [[ -z "$value" || "$value" == *troque_* ]]; then
     echo "Preencha $name no .env antes de continuar (veja o README)." >&2
